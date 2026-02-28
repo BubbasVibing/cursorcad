@@ -21,6 +21,31 @@ import InputBar from "@/components/chat/InputBar";
 import MessageBubble from "@/components/chat/MessageBubble";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import QuickPromptChips from "@/components/chat/QuickPromptChips";
+import { runJscad } from "@/lib/jscad-runner";
+
+const MAX_ATTEMPTS = 3;
+
+function buildRetryPrompt(
+  originalPrompt: string,
+  failedCode: string,
+  errorMessage: string,
+): string {
+  return `Original request: ${originalPrompt}
+
+Your previous code failed with the following error when executed in the JSCAD sandbox:
+
+--- FAILED CODE ---
+${failedCode}
+--- END CODE ---
+
+Runtime error: ${errorMessage}
+
+Please fix the code. Remember:
+- Use ONLY the 12 available primitives (cuboid, sphere, cylinder, torus, union, subtract, intersect, translate, rotate, scale, mirror)
+- No imports, no exports, no console.log
+- The code must return a single geom3 object
+- Output raw code only, no markdown fences or explanation`;
+}
 
 interface Message {
   id: string;
@@ -43,7 +68,7 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, isGenerating]);
 
-  /* ---- Handle sending a message ---- */
+  /* ---- Handle sending a message (with retry loop) ---- */
   const handleSend = async (content: string) => {
     /* Add user message */
     const userMsg: Message = {
@@ -55,31 +80,71 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
     setIsGenerating(true);
 
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: content }),
-      });
+      let currentPrompt = content;
+      let lastError = "";
 
-      const data = await res.json();
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        /* 1. Call /api/generate */
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: currentPrompt }),
+        });
 
-      if (!res.ok) {
-        const assistantMsg: Message = {
-          id: `msg-${Date.now()}`,
-          role: "assistant",
-          content: `Error: ${data.error || "Something went wrong"}`,
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-        return;
+        const data = await res.json();
+
+        /* 2. API error — show error, no retry */
+        if (!res.ok) {
+          const assistantMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: `Error: ${data.error || "Something went wrong"}`,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          return;
+        }
+
+        /* 3. Validate code in sandbox */
+        const result = runJscad(data.code);
+
+        /* 4. Success — notify parent and show message */
+        if (result.ok) {
+          onCodeGenerated?.(data.code);
+
+          if (attempt > 1) {
+            console.log(`[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} succeeded after retry`);
+          }
+
+          const assistantMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content:
+              attempt === 1
+                ? "Model generated -- check the viewport."
+                : `Model generated after ${attempt} attempts -- check the viewport.`,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          return;
+        }
+
+        /* 5. Sandbox error — log and build retry prompt */
+        lastError = result.error;
+        console.warn(
+          `[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} failed sandbox validation: ${result.error}`,
+        );
+
+        if (attempt < MAX_ATTEMPTS) {
+          currentPrompt = buildRetryPrompt(content, data.code, result.error);
+        }
       }
 
-      /* Notify parent with the generated code */
-      onCodeGenerated?.(data.code);
-
+      /* All attempts exhausted */
+      console.error(`[ChatPanel] All ${MAX_ATTEMPTS} attempts failed. Last error: ${lastError}`);
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
         role: "assistant",
-        content: "Model generated -- check the viewport.",
+        content:
+          "Sorry, I wasn't able to generate valid geometry for that description. Try rephrasing your request or simplifying the shape.",
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
