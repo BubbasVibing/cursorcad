@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { generateCode } from "@/lib/claude";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -10,12 +11,22 @@ export async function POST(req: NextRequest) {
 
   console.log("[generate] received prompt:", prompt);
 
-  // Hardcoded JSCAD response — will be replaced with Claude call in 2.2
-  const code = [
-    "const block = cuboid({ size: [4, 4, 4] });",
-    "const hole = cylinder({ radius: 1.2, height: 6 });",
-    "return subtract(block, hole);",
-  ].join("\n");
+  try {
+    const code = await generateCode(prompt.trim());
+    return NextResponse.json({ code });
+  } catch (err) {
+    console.error("[generate] error:", err);
 
-  return NextResponse.json({ code });
+    if (err instanceof Error && err.message === "MISSING_API_KEY") {
+      return NextResponse.json(
+        { error: "Server is not configured — missing API key" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Failed to generate model — please try again" },
+      { status: 502 },
+    );
+  }
 }
