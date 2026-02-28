@@ -7,6 +7,8 @@ import ViewportHUD from "@/components/viewport/ViewportHUD";
 import LoadingOverlay from "@/components/viewport/LoadingOverlay";
 import { runJscad } from "@/lib/jscad-runner";
 import { jscadToThree } from "@/lib/jscad-to-three";
+import { exportSTL } from "@/lib/stl-export";
+import type { Geom3 } from "@jscad/modeling/src/geometries/types";
 
 const DEMO_CODE = `
 const block = cuboid({ size: [4, 4, 4] });
@@ -20,15 +22,20 @@ function buildDemo() {
     const bufferGeom = jscadToThree(result.geometry);
     return {
       geometry: bufferGeom,
+      jscadGeom: result.geometry,
       error: null as string | null,
       faceCount: bufferGeom.attributes.position.count / 3,
     };
   }
-  return { geometry: null, error: result.error, faceCount: null as number | null };
+  return { geometry: null, jscadGeom: null as Geom3 | null, error: result.error, faceCount: null as number | null };
 }
 
 export default function ViewportCanvas() {
-  const { geometry, error, faceCount } = buildDemo();
+  const { geometry, jscadGeom, error, faceCount } = buildDemo();
+
+  function handleExport() {
+    if (jscadGeom) exportSTL(jscadGeom);
+  }
 
   return (
     <div className="relative h-full w-full bg-zinc-900">
@@ -37,6 +44,7 @@ export default function ViewportCanvas() {
         modelName={geometry ? "Demo: Cube with hole" : null}
         faceCount={faceCount}
         isWatertight={geometry ? true : null}
+        onExport={handleExport}
       />
 
       {/* Error overlay */}
