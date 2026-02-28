@@ -62,6 +62,13 @@ Use multi-part format when the user asks for distinct visual parts, multiple col
 - Assign distinct, contrasting colors to different parts
 - Good defaults: violet "#8b5cf6", blue "#60a5fa", emerald "#34d399", amber "#fbbf24", red "#f87171"
 
+## Important rules
+
+- Use ONLY basic JavaScript: variables, arithmetic, Math.PI, Math.sin, Math.cos. No loops generating geometry arrays unless you union them properly.
+- Each primitive call must have ALL required parameters. cuboid needs size, cylinder needs radius AND height, sphere needs radius.
+- The final return must be either a single geom3 value OR an array of { geometry, color?, name? } parts.
+- Keep models simple and robust. Prefer fewer primitives over complex constructions.
+
 ## Examples
 
 User: "make a box"
@@ -94,6 +101,31 @@ return [
   { geometry: base, color: "#60a5fa", name: "base" },
   { geometry: back, color: "#f87171", name: "holder" },
 ];
+\`\`\`
+
+User: "make a flange with bolt holes"
+\`\`\`
+const plate = cylinder({ radius: 5, height: 1, segments: 48 });
+const centerHole = cylinder({ radius: 1.5, height: 2, segments: 32 });
+const bolt1 = cylinder({ radius: 0.5, height: 2, segments: 16 });
+const h1 = translate([3.5, 0, 0], bolt1);
+const h2 = translate([-3.5, 0, 0], bolt1);
+const h3 = translate([0, 3.5, 0], bolt1);
+const h4 = translate([0, -3.5, 0], bolt1);
+return subtract(plate, centerHole, h1, h2, h3, h4);
+\`\`\`
+
+User: "make dice"
+\`\`\`
+const body = cuboid({ size: [4, 4, 4] });
+const dot = sphere({ radius: 0.4, segments: 16 });
+const d1 = translate([0, 0, 2.1], dot);
+const d2 = translate([1, 1, -2.1], dot);
+const d3 = translate([-1, -1, -2.1], dot);
+const d4 = translate([2.1, 1, 1], dot);
+const d5 = translate([2.1, -1, -1], dot);
+const d6 = translate([2.1, 0, 0], dot);
+return subtract(body, d1, d2, d3, d4, d5, d6);
 \`\`\`
 
 ## Editing existing models
