@@ -148,10 +148,15 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
   function handleExport() {
     if (!jscadGeom) return;
     const slug = modelDescription ? slugify(modelDescription) : "model";
-    if (exportFormat === "3mf") {
-      export3MF(jscadGeom, `${slug}.3mf`);
-    } else {
-      exportSTL(jscadGeom, `${slug}.stl`);
+    try {
+      if (exportFormat === "3mf") {
+        export3MF(jscadGeom, `${slug}.3mf`);
+      } else {
+        exportSTL(jscadGeom, `${slug}.stl`);
+      }
+    } catch (err) {
+      console.error("[Export] Failed:", err);
+      alert(`Export failed. Try the other format or regenerate the model.`);
     }
   }
 

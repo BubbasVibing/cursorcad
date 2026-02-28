@@ -14,10 +14,10 @@
 const PROMPTS = [
   "Simple box with lid",
   "Phone stand",
-  "Gear with 12 teeth",
-  "Cable organizer",
-  "Hex nut M8",
-  "Vase with spiral pattern",
+  "Pipe flange with bolt holes",
+  "Shelf bracket",
+  "Bearing block",
+  "Dice",
 ] as const;
 
 interface QuickPromptChipsProps {

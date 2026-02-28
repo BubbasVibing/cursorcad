@@ -69,6 +69,9 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
   /** Conversation history sent to Claude (separate from UI messages). */
   const conversationRef = useRef<ConversationMessage[]>([]);
 
+  /** Guard against rapid double-sends before isGenerating state propagates. */
+  const sendingRef = useRef(false);
+
   /* ---- Auto-scroll to bottom when new messages arrive ---- */
   useEffect(() => {
     const el = scrollRef.current;
@@ -77,6 +80,10 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
 
   /* ---- Handle sending a message (with retry loop) ---- */
   const handleSend = async (content: string) => {
+    /* Prevent rapid double-sends */
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+
     /* Add user message to UI */
     const userMsg: Message = {
       id: `msg-${Date.now()}`,
@@ -123,7 +130,23 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
           body: JSON.stringify({ messages: attemptMessages, currentCode }),
         });
 
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch {
+          /* Response wasn't JSON (e.g. HTML 502/504 from gateway) */
+          const assistantMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: "Error: Server returned an unexpected response. Please try again.",
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          conversationRef.current.push({
+            role: "assistant",
+            content: "I was unable to generate valid code for that request.",
+          });
+          return;
+        }
 
         /* 2. API error — show error, no retry */
         if (!res.ok) {
@@ -204,6 +227,7 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
     } finally {
       setIsGenerating(false);
       onGeneratingChange?.(false);
+      sendingRef.current = false;
     }
   };
 
