@@ -44,7 +44,7 @@ Runtime error: ${errorMessage}
 Please fix the code. Remember:
 - Use ONLY the 11 available primitives (cuboid, sphere, cylinder, torus, union, subtract, intersect, translate, rotate, scale, mirror)
 - No imports, no exports, no console.log
-- The code must return a single geom3 object
+- The code must return either a single geom3 object or an array of { geometry, color?, name? } parts
 - Output raw code only, no markdown fences or explanation`;
 }
 

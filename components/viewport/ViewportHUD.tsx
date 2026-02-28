@@ -19,6 +19,7 @@ export type ExportFormat = "stl" | "3mf";
 interface ViewportHUDProps {
   modelName?: string | null;
   faceCount?: number | null;
+  partCount?: number | null;
   isWatertight?: boolean | null;
   onExport?: () => void;
   exportFormat?: ExportFormat;
@@ -30,6 +31,7 @@ interface ViewportHUDProps {
 export default function ViewportHUD({
   modelName = null,
   faceCount = null,
+  partCount = null,
   isWatertight = null,
   onExport,
   exportFormat = "stl",
@@ -50,6 +52,9 @@ export default function ViewportHUD({
 
         {/* Top-right: face count + watertight status */}
         <div className="flex items-center gap-3 text-gray-400">
+          {partCount != null && partCount > 1 && (
+            <span>{partCount} parts</span>
+          )}
           <span>
             {faceCount != null ? `${faceCount.toLocaleString()} faces` : "-- faces"}
           </span>

@@ -1,49 +1,61 @@
 "use client";
 
 /**
- * GeometryMesh -- R3F mesh that renders the generated 3D geometry.
+ * GeometryMesh -- Renders one or more 3D parts from the JSCAD pipeline.
  *
  * Supports solid and wireframe rendering modes.
- *
- * Props:
- *   geometry  -- optional THREE.BufferGeometry from the JSCAD pipeline
- *   wireframe -- whether to render in wireframe mode
+ * Each part gets its own color from the part data or a default palette.
  */
 
-import type { BufferGeometry } from "three";
+import type { ThreePart } from "@/lib/types";
+
+const DEFAULT_PALETTE = [
+  "#8b5cf6", // violet-500
+  "#60a5fa", // blue-400
+  "#34d399", // emerald-400
+  "#fbbf24", // amber-400
+  "#f87171", // red-400
+  "#a78bfa", // violet-400
+  "#38bdf8", // sky-400
+  "#fb923c", // orange-400
+];
 
 interface GeometryMeshProps {
-  geometry?: BufferGeometry | null;
+  parts?: ThreePart[] | null;
   wireframe?: boolean;
 }
 
-export default function GeometryMesh({ geometry, wireframe = false }: GeometryMeshProps) {
-  if (!geometry) return null;
+export default function GeometryMesh({ parts, wireframe = false }: GeometryMeshProps) {
+  if (!parts || parts.length === 0) return null;
 
   return (
     <group>
-      <mesh geometry={geometry}>
-        <meshStandardMaterial
-          color="#b0b0b8"
-          roughness={0.6}
-          metalness={0.1}
-          flatShading
-          wireframe={wireframe}
-        />
-      </mesh>
-      {/* In wireframe mode, also render a faint solid underneath for depth */}
-      {wireframe && (
-        <mesh geometry={geometry}>
-          <meshStandardMaterial
-            color="#b0b0b8"
-            roughness={0.6}
-            metalness={0.1}
-            flatShading
-            transparent
-            opacity={0.08}
-          />
-        </mesh>
-      )}
+      {parts.map((part, i) => {
+        const color = part.color || DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
+        return (
+          <group key={i}>
+            <mesh geometry={part.geometry} castShadow receiveShadow>
+              <meshStandardMaterial
+                color={color}
+                roughness={0.5}
+                metalness={0.1}
+                wireframe={wireframe}
+              />
+            </mesh>
+            {wireframe && (
+              <mesh geometry={part.geometry}>
+                <meshStandardMaterial
+                  color={color}
+                  roughness={0.5}
+                  metalness={0.1}
+                  transparent
+                  opacity={0.08}
+                />
+              </mesh>
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 }

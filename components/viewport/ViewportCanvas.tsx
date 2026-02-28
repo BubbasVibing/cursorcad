@@ -3,42 +3,40 @@
 /**
  * ViewportCanvas -- The core 3D scene for the CAD Cursor application.
  *
- * Theme: Light -- #e5e5ea canvas background, white platform, soft gray grid.
+ * Theme: Light -- #eeeef2 canvas background, black grid lines.
  *
  * Contains:
- *   - R3F Canvas with OrbitControls
- *   - White ground platform with gridHelper overlay
- *   - XYZ axis indicator lines (red/green/blue)
+ *   - R3F Canvas with OrbitControls, retina DPR, shadows, tone mapping
+ *   - gridHelper overlay with XYZ axis indicator lines
  *   - Grid size controls (+/- buttons) and reset-view button
- *   - JSCAD geometry rendering via GeometryMesh
+ *   - Multi-part JSCAD geometry rendering via GeometryMesh
  *   - HUD overlay, error overlay, and loading overlay
- *
- * PRESERVES all backend integration:
- *   - DEMO_CODE constant for default scene
- *   - runJscad() + jscadToThree() pipeline in useMemo
- *   - exportSTL() for STL file download
- *   - ViewportHUD with model info and export button
- *   - Error overlay for JSCAD compilation errors
  */
 
 import { useMemo, useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { ACESFilmicToneMapping } from "three";
 import GeometryMesh from "@/components/viewport/GeometryMesh";
 import ViewportHUD from "@/components/viewport/ViewportHUD";
 import LoadingOverlay from "@/components/viewport/LoadingOverlay";
 import { runJscad } from "@/lib/jscad-runner";
-import { jscadToThree } from "@/lib/jscad-to-three";
+import { jscadPartsToThree } from "@/lib/jscad-to-three";
 import { exportSTL } from "@/lib/stl-export";
 import { export3MF } from "@/lib/3mf-export";
-import type { Geom3 } from "@jscad/modeling/src/geometries/types";
+import type { JscadPart, ThreePart } from "@/lib/types";
 import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 
-/* ---- Demo code shown when no user-generated code is present ---- */
+/* ---- Demo code: multi-part showcase ---- */
 const DEMO_CODE = `
 const block = cuboid({ size: [4, 4, 4] });
 const hole = cylinder({ radius: 1.2, height: 6 });
-return subtract(block, hole);
+const body = subtract(block, hole);
+const knob = translate([0, 0, 3], cylinder({ radius: 0.8, height: 1.5 }));
+return [
+  { geometry: body, color: "#8b5cf6", name: "body" },
+  { geometry: knob, color: "#60a5fa", name: "knob" },
+];
 `;
 
 interface ViewportCanvasProps {
@@ -58,14 +56,8 @@ function slugify(text: string): string {
 
 /**
  * AxisLines -- Renders XYZ axis indicator lines at the origin.
- *
- * Uses native Three.js <line> primitives with bufferGeometry:
- *   - Red   (X axis): extends along +X
- *   - Green (Y axis): extends along +Y
- *   - Blue  (Z axis): extends along +Z
  */
 function AxisLines({ length }: { length: number }) {
-  /* Pre-compute axis vertex positions as Float32Arrays */
   const axes = useMemo(() => {
     const halfLen = length / 2;
     return {
@@ -77,35 +69,21 @@ function AxisLines({ length }: { length: number }) {
 
   return (
     <group>
-      {/* X axis -- red */}
       <line>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[axes.x, 3]}
-          />
+          <bufferAttribute attach="attributes-position" args={[axes.x, 3]} />
         </bufferGeometry>
         <lineBasicMaterial color="#ef4444" />
       </line>
-
-      {/* Y axis -- green */}
       <line>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[axes.y, 3]}
-          />
+          <bufferAttribute attach="attributes-position" args={[axes.y, 3]} />
         </bufferGeometry>
         <lineBasicMaterial color="#22c55e" />
       </line>
-
-      {/* Z axis -- blue */}
       <line>
         <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[axes.z, 3]}
-          />
+          <bufferAttribute attach="attributes-position" args={[axes.z, 3]} />
         </bufferGeometry>
         <lineBasicMaterial color="#3b82f6" />
       </line>
@@ -117,59 +95,60 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
   const code = jscadCode || DEMO_CODE;
   const isDemo = !jscadCode;
 
-  /* ---- Export format toggle ---- */
   const [exportFormat, setExportFormat] = useState<"stl" | "3mf">("stl");
-
-  /* ---- Wireframe toggle ---- */
   const [wireframe, setWireframe] = useState(false);
-
-  /* ---- Grid size control ---- */
   const [gridSize, setGridSize] = useState(20);
-
-  /* ---- OrbitControls ref for reset-view ---- */
   const controlsRef = useRef<OrbitControlsType>(null);
 
-  /* ---- JSCAD pipeline: compile code -> geometry ---- */
-  const { geometry, jscadGeom, error, faceCount } = useMemo(() => {
+  /* ---- JSCAD pipeline: compile code -> multi-part geometry ---- */
+  const { parts, jscadParts, error, faceCount, partCount } = useMemo(() => {
     const result = runJscad(code);
     if (result.ok) {
-      const bufferGeom = jscadToThree(result.geometry);
+      const threeParts = jscadPartsToThree(result.parts);
+      const totalFaces = threeParts.reduce(
+        (sum, p) => sum + p.geometry.attributes.position.count / 3,
+        0,
+      );
       return {
-        geometry: bufferGeom,
-        jscadGeom: result.geometry,
+        parts: threeParts as ThreePart[],
+        jscadParts: result.parts,
         error: null as string | null,
-        faceCount: bufferGeom.attributes.position.count / 3,
+        faceCount: totalFaces,
+        partCount: threeParts.length,
       };
     }
-    return { geometry: null, jscadGeom: null as Geom3 | null, error: result.error, faceCount: null as number | null };
+    return {
+      parts: null as ThreePart[] | null,
+      jscadParts: null as JscadPart[] | null,
+      error: result.error,
+      faceCount: null as number | null,
+      partCount: null as number | null,
+    };
   }, [code]);
 
   /* ---- Export handler ---- */
   function handleExport() {
-    if (!jscadGeom) return;
+    if (!jscadParts) return;
+    const geoms = jscadParts.map((p) => p.geometry);
     const slug = modelDescription ? slugify(modelDescription) : "model";
     if (exportFormat === "3mf") {
-      export3MF(jscadGeom, `${slug}.3mf`);
+      export3MF(geoms, `${slug}.3mf`);
     } else {
-      exportSTL(jscadGeom, `${slug}.stl`);
+      exportSTL(geoms, `${slug}.stl`);
     }
   }
 
-  /* ---- Reset view to default camera position ---- */
   function handleResetView() {
-    const controls = controlsRef.current;
-    if (controls) {
-      controls.reset();
-    }
+    controlsRef.current?.reset();
   }
 
   return (
     <div className="relative h-full w-full bg-gray-200">
-      {/* HUD overlay on top of the canvas */}
       <ViewportHUD
-        modelName={geometry ? (isDemo ? "Demo: Cube with hole" : "Generated Model") : null}
+        modelName={parts ? (isDemo ? "Demo: Multi-part" : "Generated Model") : null}
         faceCount={faceCount}
-        isWatertight={geometry ? true : null}
+        partCount={partCount}
+        isWatertight={parts ? true : null}
         onExport={handleExport}
         exportFormat={exportFormat}
         onExportFormatChange={setExportFormat}
@@ -177,7 +156,6 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
         onWireframeToggle={() => setWireframe((w) => !w)}
       />
 
-      {/* ---- Error overlay (light theme) ---- */}
       {error && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm">
           <div className="max-w-md rounded-xl border border-red-200 bg-white p-4 font-mono text-sm text-red-600 shadow-lg">
@@ -187,12 +165,10 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
         </div>
       )}
 
-      {/* Loading overlay (hidden by default) */}
       <LoadingOverlay visible={!!isGenerating} />
 
       {/* ---- Grid size controls (bottom-left) ---- */}
       <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1.5">
-        {/* Decrease grid size */}
         <button
           onClick={() => setGridSize((s) => Math.max(10, s - 5))}
           className="
@@ -209,7 +185,6 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
         <span className="text-[10px] font-mono text-gray-500 min-w-[3ch] text-center">
           {gridSize}
         </span>
-        {/* Increase grid size */}
         <button
           onClick={() => setGridSize((s) => Math.min(100, s + 5))}
           className="
@@ -224,7 +199,6 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
           +
         </button>
 
-        {/* Reset view button */}
         <button
           onClick={handleResetView}
           className="
@@ -236,7 +210,6 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
           "
           aria-label="Reset camera view"
         >
-          {/* Reset icon */}
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3">
             <path fillRule="evenodd" d="M8 1a7 7 0 100 14A7 7 0 008 1zM5.657 3.172a5.5 5.5 0 117.32 7.656l-.708-.708A4.5 4.5 0 105.5 8H7.25a.75.75 0 01.53 1.28l-2.5 2.5a.75.75 0 01-1.06 0l-2.5-2.5A.75.75 0 012.25 8H4a5.48 5.48 0 011.657-4.828z" clipRule="evenodd" />
           </svg>
@@ -244,28 +217,42 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
         </button>
       </div>
 
-      {/* ---- R3F Canvas ---- */}
+      {/* ---- R3F Canvas with quality settings ---- */}
       <Canvas
         camera={{ position: [6, 4, 6], fov: 45 }}
-        gl={{ antialias: true }}
-        style={{ background: "#eeeef2" }} /* warm light grey canvas */
+        dpr={[1, 2]}
+        shadows
+        gl={{
+          antialias: true,
+          toneMapping: ACESFilmicToneMapping,
+          toneMappingExposure: 1.2,
+        }}
+        style={{ background: "#eeeef2" }}
       >
-        {/* ---- Lighting: three-point setup for polished look ---- */}
+        {/* ---- Lighting ---- */}
         <ambientLight intensity={0.5} />
-        <directionalLight position={[8, 12, 5]} intensity={0.9} />
+        <directionalLight
+          position={[8, 12, 5]}
+          intensity={0.9}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+          shadow-camera-far={50}
+          shadow-camera-left={-15}
+          shadow-camera-right={15}
+          shadow-camera-top={15}
+          shadow-camera-bottom={-15}
+        />
         <directionalLight position={[-4, 6, -8]} intensity={0.25} />
         <directionalLight position={[0, -4, 6]} intensity={0.15} />
 
-        {/* ---- Ground elements: remount when gridSize changes ---- */}
+        {/* ---- Grid: remount when gridSize changes ---- */}
         <group key={gridSize}>
-          {/* Grid lines -- soft, subtle appearance */}
-          <gridHelper args={[gridSize, gridSize, "#c0c0c0", "#d8d8dd"]} position={[0, 0, 0]} />
+          <gridHelper args={[gridSize, gridSize, "#000000", "#333333"]} position={[0, 0, 0]} />
         </group>
 
-        {/* ---- XYZ axis lines ---- */}
         <AxisLines length={gridSize} />
 
-        {/* ---- Camera controls ---- */}
         <OrbitControls
           ref={controlsRef}
           makeDefault
@@ -275,8 +262,8 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
           maxDistance={500}
         />
 
-        {/* ---- 3D geometry from JSCAD pipeline ---- */}
-        <GeometryMesh geometry={geometry} wireframe={wireframe} />
+        {/* ---- Multi-part 3D geometry from JSCAD pipeline ---- */}
+        <GeometryMesh parts={parts} wireframe={wireframe} />
       </Canvas>
     </div>
   );
