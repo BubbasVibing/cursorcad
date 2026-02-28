@@ -22,6 +22,7 @@ import MessageBubble from "@/components/chat/MessageBubble";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import QuickPromptChips from "@/components/chat/QuickPromptChips";
 import { runJscad } from "@/lib/jscad-runner";
+import type { ConversationMessage } from "@/lib/types";
 
 const MAX_ATTEMPTS = 3;
 
@@ -41,7 +42,7 @@ ${failedCode}
 Runtime error: ${errorMessage}
 
 Please fix the code. Remember:
-- Use ONLY the 12 available primitives (cuboid, sphere, cylinder, torus, union, subtract, intersect, translate, rotate, scale, mirror)
+- Use ONLY the 11 available primitives (cuboid, sphere, cylinder, torus, union, subtract, intersect, translate, rotate, scale, mirror)
 - No imports, no exports, no console.log
 - The code must return a single geom3 object
 - Output raw code only, no markdown fences or explanation`;
@@ -56,12 +57,16 @@ interface Message {
 interface ChatPanelProps {
   onCodeGenerated?: (code: string) => void;
   onGeneratingChange?: (generating: boolean) => void;
+  currentCode?: string | null;
 }
 
-export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatPanelProps) {
+export default function ChatPanel({ onCodeGenerated, onGeneratingChange, currentCode }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  /** Conversation history sent to Claude (separate from UI messages). */
+  const conversationRef = useRef<ConversationMessage[]>([]);
 
   /* ---- Auto-scroll to bottom when new messages arrive ---- */
   useEffect(() => {
@@ -71,7 +76,7 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatP
 
   /* ---- Handle sending a message (with retry loop) ---- */
   const handleSend = async (content: string) => {
-    /* Add user message */
+    /* Add user message to UI */
     const userMsg: Message = {
       id: `msg-${Date.now()}`,
       role: "user",
@@ -81,16 +86,39 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatP
     setIsGenerating(true);
     onGeneratingChange?.(true);
 
+    /* Track conversation for Claude */
+    conversationRef.current.push({ role: "user", content });
+
+    /* Detect if this is an edit (model already exists in viewport) */
+    const isEdit = !!currentCode;
+
     try {
-      let currentPrompt = content;
       let lastError = "";
+      let lastFailedCode = "";
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        /* Build the messages array for this attempt.
+         * First attempt: use conversationRef as-is.
+         * Retries: append the failed code + retry prompt as temporary messages
+         * WITHOUT persisting to conversationRef. */
+        let attemptMessages: ConversationMessage[];
+
+        if (attempt === 1) {
+          attemptMessages = [...conversationRef.current];
+        } else {
+          /* Temporary messages for retry — not persisted */
+          attemptMessages = [
+            ...conversationRef.current,
+            { role: "assistant", content: lastFailedCode },
+            { role: "user", content: buildRetryPrompt(content, lastFailedCode, lastError) },
+          ];
+        }
+
         /* 1. Call /api/generate */
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: currentPrompt }),
+          body: JSON.stringify({ messages: attemptMessages, currentCode }),
         });
 
         const data = await res.json();
@@ -103,6 +131,11 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatP
             content: `Error: ${data.error || "Something went wrong"}`,
           };
           setMessages((prev) => [...prev, assistantMsg]);
+          /* Persist failure to maintain alternation */
+          conversationRef.current.push({
+            role: "assistant",
+            content: "I was unable to generate valid code for that request.",
+          });
           return;
         }
 
@@ -117,27 +150,27 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatP
             console.log(`[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} succeeded after retry`);
           }
 
+          const label = isEdit ? "Model updated" : "Model generated";
           const assistantMsg: Message = {
             id: `msg-${Date.now()}`,
             role: "assistant",
             content:
               attempt === 1
-                ? "Model generated -- check the viewport."
-                : `Model generated after ${attempt} attempts -- check the viewport.`,
+                ? `${label} — check the viewport.`
+                : `${label} after ${attempt} attempts — check the viewport.`,
           };
           setMessages((prev) => [...prev, assistantMsg]);
+          /* Persist the actual code as assistant turn */
+          conversationRef.current.push({ role: "assistant", content: data.code });
           return;
         }
 
-        /* 5. Sandbox error — log and build retry prompt */
+        /* 5. Sandbox error — log and prepare for retry */
         lastError = result.error;
+        lastFailedCode = data.code;
         console.warn(
           `[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} failed sandbox validation: ${result.error}`,
         );
-
-        if (attempt < MAX_ATTEMPTS) {
-          currentPrompt = buildRetryPrompt(content, data.code, result.error);
-        }
       }
 
       /* All attempts exhausted */
@@ -149,6 +182,11 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatP
           "Sorry, I wasn't able to generate valid geometry for that description. Try rephrasing your request or simplifying the shape.",
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      /* Persist failure to maintain alternation */
+      conversationRef.current.push({
+        role: "assistant",
+        content: "I was unable to generate valid code for that request.",
+      });
     } catch {
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
@@ -156,6 +194,11 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatP
         content: "Error: Failed to reach the server. Is the dev server running?",
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      /* Persist failure to maintain alternation */
+      conversationRef.current.push({
+        role: "assistant",
+        content: "I was unable to generate valid code for that request.",
+      });
     } finally {
       setIsGenerating(false);
       onGeneratingChange?.(false);

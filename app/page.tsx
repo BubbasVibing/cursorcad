@@ -180,7 +180,7 @@ export default function Home() {
         />
 
         {/* ---- Chat panel content ---- */}
-        <ChatPanel onCodeGenerated={setJscadCode} onGeneratingChange={setIsGenerating} />
+        <ChatPanel onCodeGenerated={setJscadCode} onGeneratingChange={setIsGenerating} currentCode={jscadCode} />
       </aside>
     </div>
   );

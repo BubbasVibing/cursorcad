@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCode } from "@/lib/claude";
+import type { ConversationMessage } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { prompt } = body;
+  const { messages, currentCode } = body as {
+    messages: ConversationMessage[];
+    currentCode?: string | null;
+  };
 
-  if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-    return NextResponse.json({ error: "prompt is required" }, { status: 400 });
+  if (
+    !Array.isArray(messages) ||
+    messages.length === 0 ||
+    messages[messages.length - 1].role !== "user"
+  ) {
+    return NextResponse.json(
+      { error: "messages must be a non-empty array ending with a user message" },
+      { status: 400 },
+    );
   }
 
   try {
-    const code = await generateCode(prompt.trim());
+    const code = await generateCode(messages, currentCode);
     return NextResponse.json({ code });
   } catch (err) {
     console.error("[generate] error:", err);
