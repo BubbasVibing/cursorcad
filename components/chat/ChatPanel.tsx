@@ -8,8 +8,8 @@
  *   2. Scrollable message area (shows welcome state when empty)
  *   3. InputBar pinned at the bottom
  *
- * State management is self-contained for now. Messages are stored
- * locally; AI integration will replace the stub response logic later.
+ * Calls /api/generate to get JSCAD code from Claude, then notifies
+ * the parent via onCodeGenerated so the Viewport can render the model.
  */
 
 import { useState, useRef, useEffect } from "react";
@@ -24,7 +24,11 @@ interface Message {
   content: string;
 }
 
-export default function ChatPanel() {
+interface ChatPanelProps {
+  onCodeGenerated?: (code: string) => void;
+}
+
+export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -36,7 +40,7 @@ export default function ChatPanel() {
   }, [messages, isGenerating]);
 
   /* ---- Handle sending a message ---- */
-  const handleSend = (content: string) => {
+  const handleSend = async (content: string) => {
     /* Add user message */
     const userMsg: Message = {
       id: `msg-${Date.now()}`,
@@ -46,18 +50,44 @@ export default function ChatPanel() {
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
 
-    /* Simulate an assistant response after a short delay.
-       This will be replaced by the real AI call later. */
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: content }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        const assistantMsg: Message = {
+          id: `msg-${Date.now()}`,
+          role: "assistant",
+          content: `Error: ${data.error || "Something went wrong"}`,
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        return;
+      }
+
+      /* Notify parent with the generated code */
+      onCodeGenerated?.(data.code);
+
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
         role: "assistant",
-        content:
-          "I'll generate that 3D model for you. This is a placeholder response -- real JSCAD generation will be wired up soon.",
+        content: "Model generated — check the viewport.",
       };
       setMessages((prev) => [...prev, assistantMsg]);
+    } catch {
+      const assistantMsg: Message = {
+        id: `msg-${Date.now()}`,
+        role: "assistant",
+        content: "Error: Failed to reach the server. Is the dev server running?",
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
   const hasMessages = messages.length > 0;

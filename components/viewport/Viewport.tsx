@@ -30,10 +30,14 @@ const ViewportCanvas = dynamic(
   }
 );
 
-export default function Viewport() {
+interface ViewportProps {
+  jscadCode?: string | null;
+}
+
+export default function Viewport({ jscadCode }: ViewportProps) {
   return (
     <div className="h-full w-full">
-      <ViewportCanvas />
+      <ViewportCanvas jscadCode={jscadCode} />
     </div>
   );
 }

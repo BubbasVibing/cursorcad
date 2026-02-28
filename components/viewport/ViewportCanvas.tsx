@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid } from "@react-three/drei";
 import GeometryMesh from "@/components/viewport/GeometryMesh";
@@ -16,22 +17,27 @@ const hole = cylinder({ radius: 1.2, height: 6 });
 return subtract(block, hole);
 `;
 
-function buildDemo() {
-  const result = runJscad(DEMO_CODE);
-  if (result.ok) {
-    const bufferGeom = jscadToThree(result.geometry);
-    return {
-      geometry: bufferGeom,
-      jscadGeom: result.geometry,
-      error: null as string | null,
-      faceCount: bufferGeom.attributes.position.count / 3,
-    };
-  }
-  return { geometry: null, jscadGeom: null as Geom3 | null, error: result.error, faceCount: null as number | null };
+interface ViewportCanvasProps {
+  jscadCode?: string | null;
 }
 
-export default function ViewportCanvas() {
-  const { geometry, jscadGeom, error, faceCount } = buildDemo();
+export default function ViewportCanvas({ jscadCode }: ViewportCanvasProps) {
+  const code = jscadCode || DEMO_CODE;
+  const isDemo = !jscadCode;
+
+  const { geometry, jscadGeom, error, faceCount } = useMemo(() => {
+    const result = runJscad(code);
+    if (result.ok) {
+      const bufferGeom = jscadToThree(result.geometry);
+      return {
+        geometry: bufferGeom,
+        jscadGeom: result.geometry,
+        error: null as string | null,
+        faceCount: bufferGeom.attributes.position.count / 3,
+      };
+    }
+    return { geometry: null, jscadGeom: null as Geom3 | null, error: result.error, faceCount: null as number | null };
+  }, [code]);
 
   function handleExport() {
     if (jscadGeom) exportSTL(jscadGeom);
@@ -41,7 +47,7 @@ export default function ViewportCanvas() {
     <div className="relative h-full w-full bg-zinc-900">
       {/* HUD overlay on top of the canvas */}
       <ViewportHUD
-        modelName={geometry ? "Demo: Cube with hole" : null}
+        modelName={geometry ? (isDemo ? "Demo: Cube with hole" : "Generated Model") : null}
         faceCount={faceCount}
         isWatertight={geometry ? true : null}
         onExport={handleExport}
