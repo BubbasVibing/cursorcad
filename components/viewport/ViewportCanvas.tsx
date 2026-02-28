@@ -27,16 +27,11 @@ import { export3MF } from "@/lib/3mf-export";
 import type { JscadPart, ThreePart } from "@/lib/types";
 import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 
-/* ---- Demo code: multi-part showcase ---- */
+/* ---- Demo code shown when no user-generated code is present ---- */
 const DEMO_CODE = `
 const block = cuboid({ size: [4, 4, 4] });
-const hole = cylinder({ radius: 1.2, height: 6 });
-const body = subtract(block, hole);
-const knob = translate([0, 0, 3], cylinder({ radius: 0.8, height: 1.5 }));
-return [
-  { geometry: body, color: "#8b5cf6", name: "body" },
-  { geometry: knob, color: "#60a5fa", name: "knob" },
-];
+const hole = cylinder({ radius: 1.2, height: 6, segments: 32 });
+return subtract(block, hole);
 `;
 
 interface ViewportCanvasProps {
@@ -150,7 +145,7 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
   return (
     <div className="relative h-full w-full bg-gray-200">
       <ViewportHUD
-        modelName={parts ? (isDemo ? "Demo: Multi-part" : "Generated Model") : null}
+        modelName={parts ? (isDemo ? "Demo: Cube with hole" : "Generated Model") : null}
         faceCount={faceCount}
         partCount={partCount}
         isWatertight={parts ? true : null}
