@@ -25,9 +25,10 @@ export default function GeometryMesh({ geometry }: GeometryMeshProps) {
     <mesh geometry={geometry}>
       {/* Standard physical material for 3D-printable part visualization */}
       <meshStandardMaterial
-        color="#a8a8a8" /* Neutral gray, like a 3D print filament */
+        color="#a8a8a8"
         roughness={0.6}
         metalness={0.1}
+        flatShading
       />
     </mesh>
   );

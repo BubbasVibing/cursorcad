@@ -1,30 +1,53 @@
 "use client";
 
-/**
- * ViewportCanvas -- The inner R3F Canvas component that renders the 3D scene.
- *
- * Separated into its own file so the parent Viewport.tsx can dynamically
- * import it with `ssr: false`. Three.js and R3F cannot run on the server.
- *
- * Scene setup:
- *   - Dark background matching the application theme
- *   - Ambient + directional lighting for balanced illumination
- *   - OrbitControls for camera interaction (rotate, zoom, pan)
- *   - Subtle ground-plane grid
- *   - GeometryMesh placeholder (renders nothing until geometry is provided)
- */
-
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Grid } from "@react-three/drei";
 import GeometryMesh from "@/components/viewport/GeometryMesh";
 import ViewportHUD from "@/components/viewport/ViewportHUD";
 import LoadingOverlay from "@/components/viewport/LoadingOverlay";
+import { runJscad } from "@/lib/jscad-runner";
+import { jscadToThree } from "@/lib/jscad-to-three";
+
+const DEMO_CODE = `
+const block = cuboid({ size: [4, 4, 4] });
+const hole = cylinder({ radius: 1.2, height: 6 });
+return subtract(block, hole);
+`;
+
+function buildDemo() {
+  const result = runJscad(DEMO_CODE);
+  if (result.ok) {
+    const bufferGeom = jscadToThree(result.geometry);
+    return {
+      geometry: bufferGeom,
+      error: null as string | null,
+      faceCount: bufferGeom.attributes.position.count / 3,
+    };
+  }
+  return { geometry: null, error: result.error, faceCount: null as number | null };
+}
 
 export default function ViewportCanvas() {
+  const { geometry, error, faceCount } = buildDemo();
+
   return (
     <div className="relative h-full w-full bg-zinc-900">
       {/* HUD overlay on top of the canvas */}
-      <ViewportHUD />
+      <ViewportHUD
+        modelName={geometry ? "Demo: Cube with hole" : null}
+        faceCount={faceCount}
+        isWatertight={geometry ? true : null}
+      />
+
+      {/* Error overlay */}
+      {error && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-900/80">
+          <div className="max-w-md rounded-lg border border-red-800 bg-zinc-900 p-4 font-mono text-sm text-red-400">
+            <p className="mb-1 font-semibold">JSCAD Error</p>
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Loading overlay (hidden by default) */}
       <LoadingOverlay visible={false} />
@@ -36,22 +59,19 @@ export default function ViewportCanvas() {
         style={{ background: "#18181b" }} /* zinc-900 */
       >
         {/* ---- Lighting ---- */}
-        {/* Soft ambient fill so shadows aren't pitch black */}
         <ambientLight intensity={0.4} />
-        {/* Primary directional light from upper-right */}
         <directionalLight position={[8, 12, 5]} intensity={0.8} />
-        {/* Subtle back-fill to reduce harsh contrast */}
         <directionalLight position={[-4, 6, -8]} intensity={0.2} />
 
         {/* ---- Ground grid ---- */}
         <Grid
-          args={[20, 20]}          /* 20x20 unit grid */
-          cellSize={1}             /* 1 unit between minor lines */
+          args={[20, 20]}
+          cellSize={1}
           cellThickness={0.5}
-          cellColor="#27272a"       /* zinc-800: subtle minor lines */
-          sectionSize={5}           /* major line every 5 units */
+          cellColor="#27272a"
+          sectionSize={5}
           sectionThickness={1}
-          sectionColor="#3f3f46"    /* zinc-700: slightly brighter major lines */
+          sectionColor="#3f3f46"
           fadeDistance={30}
           fadeStrength={1}
           infiniteGrid
@@ -67,8 +87,8 @@ export default function ViewportCanvas() {
           maxDistance={50}
         />
 
-        {/* ---- 3D geometry placeholder ---- */}
-        <GeometryMesh />
+        {/* ---- 3D geometry ---- */}
+        <GeometryMesh geometry={geometry} />
       </Canvas>
     </div>
   );
