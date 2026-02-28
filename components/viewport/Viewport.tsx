@@ -7,8 +7,7 @@
  * This component uses Next.js `dynamic()` with `ssr: false` to ensure the
  * Canvas and all Three.js code only runs in the browser.
  *
- * The dynamic import targets ViewportCanvas, which contains the actual
- * <Canvas>, lighting, grid, controls, and overlays.
+ * Theme: Light -- gray-200 loading bg, violet-500 spinner accent.
  */
 
 import dynamic from "next/dynamic";
@@ -20,10 +19,11 @@ const ViewportCanvas = dynamic(
     ssr: false,
     /* Show a minimal loading state while the 3D engine initializes */
     loading: () => (
-      <div className="flex h-full w-full items-center justify-center bg-zinc-900">
+      <div className="flex h-full w-full items-center justify-center bg-gray-200">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
-          <span className="text-xs text-zinc-500">Loading 3D viewport...</span>
+          {/* Spinner ring: violet accent */}
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-violet-500" />
+          <span className="text-xs text-gray-400">Loading 3D viewport...</span>
         </div>
       </div>
     ),

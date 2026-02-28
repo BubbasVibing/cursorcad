@@ -1,12 +1,16 @@
 "use client";
 
 /**
- * ChatPanel -- Left-side chat interface for the CAD Cursor application.
+ * ChatPanel -- Right-side floating chat interface for the CAD Cursor application.
  *
- * Layout (flex column, full height of left pane):
- *   1. Header bar with app name and logo mark
+ * Layout (flex column, full height of the floating island):
+ *   1. Header bar with app name and violet logo mark
  *   2. Scrollable message area (shows welcome state when empty)
  *   3. InputBar pinned at the bottom
+ *
+ * Theme: Light/glass-morphism -- white backgrounds, violet-500 accents,
+ * gray text hierarchy. The parent island container provides the glass blur,
+ * so this component uses transparent/translucent backgrounds.
  *
  * Calls /api/generate to get JSCAD code from Claude, then notifies
  * the parent via onCodeGenerated so the Viewport can render the model.
@@ -75,7 +79,7 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
         role: "assistant",
-        content: "Model generated — check the viewport.",
+        content: "Model generated -- check the viewport.",
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
@@ -93,11 +97,11 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex h-full flex-col bg-zinc-950">
+    <div className="flex h-full flex-col">
       {/* ---- Header bar ---- */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-zinc-800 px-5 py-4">
-        {/* Logo mark: stylized cube icon */}
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600">
+      <header className="flex shrink-0 items-center gap-3 border-b border-gray-200/60 px-5 py-4">
+        {/* Logo mark: stylized cube icon on violet background */}
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 20 20"
@@ -109,8 +113,8 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
           </svg>
         </div>
         <div>
-          <h1 className="text-sm font-semibold text-zinc-100">CAD Cursor</h1>
-          <p className="text-xs text-zinc-500">Prompt to 3D print</p>
+          <h1 className="text-sm font-semibold text-gray-800">CAD Cursor</h1>
+          <p className="text-xs text-gray-400">Prompt to 3D print</p>
         </div>
       </header>
 
@@ -120,14 +124,14 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
           /* ---- Empty/welcome state ---- */
           <div className="flex h-full flex-col items-center justify-center gap-6 px-6">
             {/* Welcome icon */}
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-800/80">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
-                className="h-7 w-7 text-zinc-500"
+                className="h-7 w-7 text-violet-400"
               >
                 <path
                   strokeLinecap="round"
@@ -139,10 +143,10 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
 
             {/* Welcome text */}
             <div className="text-center">
-              <h2 className="text-base font-medium text-zinc-300">
+              <h2 className="text-base font-medium text-gray-700">
                 Describe a part to get started
               </h2>
-              <p className="mt-1.5 text-sm text-zinc-500">
+              <p className="mt-1.5 text-sm text-gray-400">
                 Type a description or pick an example below
               </p>
             </div>

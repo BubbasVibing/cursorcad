@@ -9,8 +9,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
 
-  console.log("[generate] received prompt:", prompt);
-
   try {
     const code = await generateCode(prompt.trim());
     return NextResponse.json({ code });

@@ -11,7 +11,7 @@ It must end with a \`return\` statement producing a single geom3 solid.
 
 ## Available primitives
 
-These 12 primitives are passed in as function arguments:
+These 11 primitives are passed in as function arguments:
 
 - cuboid({ size: [w, h, d] }) — box centered at origin
 - sphere({ radius: r, segments?: n }) — sphere centered at origin

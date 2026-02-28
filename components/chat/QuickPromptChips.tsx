@@ -1,9 +1,11 @@
+"use client";
+
 /**
  * QuickPromptChips -- Grid of example prompt pills for empty-state onboarding.
  *
+ * Theme: Light -- white background, gray-200 borders, violet hover accents.
  * Shown beneath the welcome message when there are no messages yet.
  * Each chip fires the `onSelect` callback with its prompt text.
- * For now, if no callback is provided the prompt is logged to the console.
  *
  * Props:
  *   onSelect -- optional callback fired when a chip is clicked
@@ -26,8 +28,6 @@ export default function QuickPromptChips({ onSelect }: QuickPromptChipsProps) {
   const handleClick = (prompt: string) => {
     if (onSelect) {
       onSelect(prompt);
-    } else {
-      console.log("[QuickPromptChips] selected:", prompt);
     }
   };
 
@@ -38,11 +38,11 @@ export default function QuickPromptChips({ onSelect }: QuickPromptChipsProps) {
           key={prompt}
           onClick={() => handleClick(prompt)}
           className="
-            rounded-full border border-zinc-700 bg-zinc-900
-            px-3.5 py-1.5 text-xs text-zinc-400
+            rounded-full border border-gray-200 bg-white
+            px-3.5 py-1.5 text-xs text-gray-500
             transition-all duration-150
-            hover:border-emerald-600 hover:text-emerald-400
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
+            hover:border-violet-500 hover:text-violet-600
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500
             active:scale-95
           "
         >

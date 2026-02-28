@@ -2,8 +2,8 @@
  * MessageBubble -- Renders a single chat message.
  *
  * Two visual variants controlled by `role`:
- *   - "user"      : right-aligned, emerald accent background
- *   - "assistant" : left-aligned, darker zinc background
+ *   - "user"      : right-aligned, violet-500 background, white text
+ *   - "assistant" : left-aligned, gray-100 background, gray-800 text
  *
  * Props:
  *   role    -- who sent the message
@@ -27,10 +27,10 @@ export default function MessageBubble({ role, content }: MessageBubbleProps) {
           max-w-[85%] rounded-xl px-4 py-2.5 text-sm leading-relaxed
           ${
             isUser
-              ? /* User bubble: emerald accent, white text */
-                "bg-emerald-600 text-white"
-              : /* Assistant bubble: subtle dark surface */
-                "bg-zinc-800 text-zinc-200"
+              ? /* User bubble: violet accent, white text */
+                "bg-violet-500 text-white"
+              : /* Assistant bubble: light surface, dark text */
+                "bg-gray-100 text-gray-800"
           }
         `}
       >

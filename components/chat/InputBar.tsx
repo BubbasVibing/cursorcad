@@ -3,14 +3,16 @@
 /**
  * InputBar -- Chat input field with send button, pinned to the bottom of ChatPanel.
  *
+ * Theme: Light -- white/gray-50 background, gray-200 borders, violet-500 accents.
+ *
  * Features:
  *   - Auto-expanding <textarea> (grows with content, max 5 rows)
  *   - Enter to send, Shift+Enter for newline
  *   - Disabled state while generation is in progress
- *   - Simple inline SVG send icon (no icon library)
+ *   - Violet-500 send button and focus ring
  *
  * Props:
- *   onSend     -- callback with the message text (defaults to console.log)
+ *   onSend     -- callback with the message text
  *   disabled   -- disables the input and send button
  */
 
@@ -40,8 +42,6 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
 
     if (onSend) {
       onSend(trimmed);
-    } else {
-      console.log("[InputBar] send:", trimmed);
     }
 
     setValue("");
@@ -64,16 +64,16 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
   const isEmpty = value.trim().length === 0;
 
   return (
-    <div className="border-t border-zinc-800 bg-zinc-950 p-3">
+    <div className="border-t border-gray-200/60 p-3">
       <div
         className="
-          flex items-end gap-2 rounded-xl border border-zinc-700
-          bg-zinc-900 px-3 py-2
+          flex items-end gap-2 rounded-xl border border-gray-200
+          bg-gray-50 px-3 py-2
           transition-colors duration-150
-          focus-within:border-emerald-600
+          focus-within:border-violet-500
         "
       >
-        {/* Textarea input */}
+        {/* Textarea input -- light bg, dark text */}
         <textarea
           ref={textareaRef}
           value={value}
@@ -87,14 +87,14 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
           onKeyDown={handleKeyDown}
           className="
             max-h-[160px] min-h-[24px] flex-1 resize-none
-            bg-transparent text-sm text-zinc-100
-            placeholder:text-zinc-500
+            bg-transparent text-sm text-gray-800
+            placeholder:text-gray-400
             focus:outline-none
             disabled:cursor-not-allowed disabled:opacity-50
           "
         />
 
-        {/* Send button with inline SVG arrow icon */}
+        {/* Send button: violet-500 accent */}
         <button
           onClick={send}
           disabled={disabled || isEmpty}
@@ -102,10 +102,10 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
           className="
             flex h-8 w-8 shrink-0 items-center justify-center
             rounded-lg transition-all duration-150
-            bg-emerald-600 text-white
-            hover:bg-emerald-500
-            disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500
+            bg-violet-500 text-white
+            hover:bg-violet-400
+            disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500
             active:scale-95
           "
         >
