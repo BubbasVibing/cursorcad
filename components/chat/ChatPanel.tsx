@@ -58,9 +58,10 @@ interface ChatPanelProps {
   onCodeGenerated?: (code: string) => void;
   onGeneratingChange?: (generating: boolean) => void;
   currentCode?: string | null;
+  onPromptSent?: (prompt: string) => void;
 }
 
-export default function ChatPanel({ onCodeGenerated, onGeneratingChange, currentCode }: ChatPanelProps) {
+export default function ChatPanel({ onCodeGenerated, onGeneratingChange, currentCode, onPromptSent }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,7 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
 
     /* Track conversation for Claude */
     conversationRef.current.push({ role: "user", content });
+    onPromptSent?.(content);
 
     /* Detect if this is an edit (model already exists in viewport) */
     const isEdit = !!currentCode;

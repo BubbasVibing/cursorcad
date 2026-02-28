@@ -24,13 +24,13 @@
 import { useMemo, useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
-import { DoubleSide } from "three";
 import GeometryMesh from "@/components/viewport/GeometryMesh";
 import ViewportHUD from "@/components/viewport/ViewportHUD";
 import LoadingOverlay from "@/components/viewport/LoadingOverlay";
 import { runJscad } from "@/lib/jscad-runner";
 import { jscadToThree } from "@/lib/jscad-to-three";
 import { exportSTL } from "@/lib/stl-export";
+import { export3MF } from "@/lib/3mf-export";
 import type { Geom3 } from "@jscad/modeling/src/geometries/types";
 import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 
@@ -44,6 +44,16 @@ return subtract(block, hole);
 interface ViewportCanvasProps {
   jscadCode?: string | null;
   isGenerating?: boolean;
+  modelDescription?: string | null;
+}
+
+/** Turn a user prompt into a safe filename slug. */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "model";
 }
 
 /**
@@ -103,9 +113,15 @@ function AxisLines({ length }: { length: number }) {
   );
 }
 
-export default function ViewportCanvas({ jscadCode, isGenerating }: ViewportCanvasProps) {
+export default function ViewportCanvas({ jscadCode, isGenerating, modelDescription }: ViewportCanvasProps) {
   const code = jscadCode || DEMO_CODE;
   const isDemo = !jscadCode;
+
+  /* ---- Export format toggle ---- */
+  const [exportFormat, setExportFormat] = useState<"stl" | "3mf">("stl");
+
+  /* ---- Wireframe toggle ---- */
+  const [wireframe, setWireframe] = useState(false);
 
   /* ---- Grid size control ---- */
   const [gridSize, setGridSize] = useState(20);
@@ -130,7 +146,13 @@ export default function ViewportCanvas({ jscadCode, isGenerating }: ViewportCanv
 
   /* ---- Export handler ---- */
   function handleExport() {
-    if (jscadGeom) exportSTL(jscadGeom);
+    if (!jscadGeom) return;
+    const slug = modelDescription ? slugify(modelDescription) : "model";
+    if (exportFormat === "3mf") {
+      export3MF(jscadGeom, `${slug}.3mf`);
+    } else {
+      exportSTL(jscadGeom, `${slug}.stl`);
+    }
   }
 
   /* ---- Reset view to default camera position ---- */
@@ -149,6 +171,10 @@ export default function ViewportCanvas({ jscadCode, isGenerating }: ViewportCanv
         faceCount={faceCount}
         isWatertight={geometry ? true : null}
         onExport={handleExport}
+        exportFormat={exportFormat}
+        onExportFormatChange={setExportFormat}
+        wireframe={wireframe}
+        onWireframeToggle={() => setWireframe((w) => !w)}
       />
 
       {/* ---- Error overlay (light theme) ---- */}
@@ -222,17 +248,18 @@ export default function ViewportCanvas({ jscadCode, isGenerating }: ViewportCanv
       <Canvas
         camera={{ position: [6, 4, 6], fov: 45 }}
         gl={{ antialias: true }}
-        style={{ background: "#e5e5ea" }} /* light grey canvas background */
+        style={{ background: "#eeeef2" }} /* warm light grey canvas */
       >
-        {/* ---- Lighting (brighter for light theme) ---- */}
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[8, 12, 5]} intensity={0.8} />
-        <directionalLight position={[-4, 6, -8]} intensity={0.2} />
+        {/* ---- Lighting: three-point setup for polished look ---- */}
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[8, 12, 5]} intensity={0.9} />
+        <directionalLight position={[-4, 6, -8]} intensity={0.25} />
+        <directionalLight position={[0, -4, 6]} intensity={0.15} />
 
         {/* ---- Ground elements: remount when gridSize changes ---- */}
         <group key={gridSize}>
-          {/* Grid lines -- transparent, no solid plane */}
-          <gridHelper args={[gridSize, gridSize, "#000000", "#333333"]} position={[0, 0, 0]} />
+          {/* Grid lines -- soft, subtle appearance */}
+          <gridHelper args={[gridSize, gridSize, "#c0c0c0", "#d8d8dd"]} position={[0, 0, 0]} />
         </group>
 
         {/* ---- XYZ axis lines ---- */}
@@ -249,7 +276,7 @@ export default function ViewportCanvas({ jscadCode, isGenerating }: ViewportCanv
         />
 
         {/* ---- 3D geometry from JSCAD pipeline ---- */}
-        <GeometryMesh geometry={geometry} />
+        <GeometryMesh geometry={geometry} wireframe={wireframe} />
       </Canvas>
     </div>
   );

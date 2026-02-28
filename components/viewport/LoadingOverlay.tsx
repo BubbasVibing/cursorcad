@@ -18,7 +18,7 @@ const LOADING_MESSAGES = [
   "Compiling model...",
 ];
 
-const CYCLE_INTERVAL_MS = 2000;
+const CYCLE_INTERVAL_MS = 2200;
 
 interface LoadingOverlayProps {
   visible?: boolean;
@@ -42,13 +42,13 @@ function LoadingContent() {
   }, []);
 
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/40 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-4 rounded-2xl bg-white/80 px-8 py-6 shadow-xl backdrop-blur-md border border-gray-100">
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/30 backdrop-blur-sm transition-opacity duration-300">
+      <div className="flex flex-col items-center gap-4 rounded-2xl bg-white/90 px-10 py-7 shadow-xl backdrop-blur-md border border-gray-100/80">
         {/* Spinner ring: violet accent */}
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-violet-500" />
+        <div className="h-8 w-8 animate-spin rounded-full border-[2.5px] border-gray-200 border-t-violet-500" />
 
-        {/* Status message */}
-        <p className="text-sm font-medium text-gray-500">
+        {/* Status message with smooth crossfade */}
+        <p className="text-sm font-medium text-gray-500 transition-all duration-300">
           {LOADING_MESSAGES[messageIndex]}
         </p>
       </div>
