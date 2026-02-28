@@ -43,6 +43,7 @@ return subtract(block, hole);
 
 interface ViewportCanvasProps {
   jscadCode?: string | null;
+  isGenerating?: boolean;
 }
 
 /**
@@ -102,7 +103,7 @@ function AxisLines({ length }: { length: number }) {
   );
 }
 
-export default function ViewportCanvas({ jscadCode }: ViewportCanvasProps) {
+export default function ViewportCanvas({ jscadCode, isGenerating }: ViewportCanvasProps) {
   const code = jscadCode || DEMO_CODE;
   const isDemo = !jscadCode;
 
@@ -161,7 +162,7 @@ export default function ViewportCanvas({ jscadCode }: ViewportCanvasProps) {
       )}
 
       {/* Loading overlay (hidden by default) */}
-      <LoadingOverlay visible={false} />
+      <LoadingOverlay visible={!!isGenerating} />
 
       {/* ---- Grid size controls (bottom-left) ---- */}
       <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1.5">

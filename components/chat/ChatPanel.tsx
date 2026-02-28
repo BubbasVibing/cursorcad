@@ -55,9 +55,10 @@ interface Message {
 
 interface ChatPanelProps {
   onCodeGenerated?: (code: string) => void;
+  onGeneratingChange?: (generating: boolean) => void;
 }
 
-export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
+export default function ChatPanel({ onCodeGenerated, onGeneratingChange }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,6 +79,7 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
     };
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
+    onGeneratingChange?.(true);
 
     try {
       let currentPrompt = content;
@@ -156,6 +158,7 @@ export default function ChatPanel({ onCodeGenerated }: ChatPanelProps) {
       setMessages((prev) => [...prev, assistantMsg]);
     } finally {
       setIsGenerating(false);
+      onGeneratingChange?.(false);
     }
   };
 

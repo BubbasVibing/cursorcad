@@ -32,12 +32,13 @@ const ViewportCanvas = dynamic(
 
 interface ViewportProps {
   jscadCode?: string | null;
+  isGenerating?: boolean;
 }
 
-export default function Viewport({ jscadCode }: ViewportProps) {
+export default function Viewport({ jscadCode, isGenerating }: ViewportProps) {
   return (
     <div className="h-full w-full">
-      <ViewportCanvas jscadCode={jscadCode} />
+      <ViewportCanvas jscadCode={jscadCode} isGenerating={isGenerating} />
     </div>
   );
 }
