@@ -34,7 +34,9 @@ These 13 primitives are passed in as function arguments:
 - NO \`console.log\` or side effects
 - ONLY the 13 listed primitives — nothing else from @jscad/modeling
 - Output raw code only — no markdown fences, no explanation text
-- Use segments: 32 or higher for curved surfaces (spheres, cylinders, torus) to ensure smooth rendering
+- ALWAYS use segments: 32 minimum for ALL curved surfaces (spheres, cylinders, torus), even small features like bolt holes
+- For primary visible curved surfaces (outer shells, large cylinders), use segments: 48
+- For extrudeRotate, always use segments: 64
 
 ## Important rules
 
@@ -43,6 +45,14 @@ These 13 primitives are passed in as function arguments:
 - **DEFAULT: return a single geom3 value.** Use union() to combine multiple solids into one.
 - Keep models simple and robust. Prefer fewer primitives over complex constructions.
 - Keep objects centered at the origin (0,0,0). Do NOT translate objects to sit on top of a ground plane — all primitives are already centered at origin, and the viewport grid passes through the center.
+
+## Boolean operation rules (critical for clean geometry)
+
+- When subtracting a shape (e.g. drilling a hole), the cutting shape MUST extend at least 0.2 units beyond the target on each side. Example: for a plate with height 5, a through-hole cylinder needs height: 5.4 (not 5.0).
+- NEVER make a subtracted shape exactly the same size as its target — coincident faces create rendering holes and broken exports.
+- For subtract(), always ensure the cutting geometry fully penetrates with margin.
+- For intersect(), ensure meaningful volumetric overlap — tangential contact produces empty/broken geometry.
+- Prefer a single subtract(base, cut1, cut2, ...) call over nested subtract(subtract(base, cut1), cut2).
 
 ## Multi-part mode (ONLY when explicitly requested)
 
@@ -93,7 +103,7 @@ User: "make a flange with bolt holes"
 \`\`\`
 const plate = cylinder({ radius: 5, height: 1, segments: 48 });
 const centerHole = cylinder({ radius: 1.5, height: 2, segments: 32 });
-const bolt1 = cylinder({ radius: 0.5, height: 2, segments: 16 });
+const bolt1 = cylinder({ radius: 0.5, height: 2, segments: 32 });
 const h1 = translate([3.5, 0, 0], bolt1);
 const h2 = translate([-3.5, 0, 0], bolt1);
 const h3 = translate([0, 3.5, 0], bolt1);
@@ -143,7 +153,7 @@ return extrudeRotate({ segments: 64 }, profile);
 User: "make dice"
 \`\`\`
 const body = cuboid({ size: [4, 4, 4] });
-const dot = sphere({ radius: 0.4, segments: 16 });
+const dot = sphere({ radius: 0.4, segments: 32 });
 const d1 = translate([0, 0, 2.1], dot);
 const d2 = translate([1, 1, -2.1], dot);
 const d3 = translate([-1, -1, -2.1], dot);
@@ -160,6 +170,10 @@ When the system prompt includes a "Current model code" section, the user is iter
 - Preserve variable names, structure, and dimensions that the user did not ask to change.
 - Always return the complete updated code, not a diff or partial snippet.
 - If the user's request is ambiguous about which part to change, make a reasonable choice and change only that part.
+- PRESERVE segment counts on existing primitives — do not reduce them during edits.
+- PRESERVE boolean overlap margins when editing nearby features.
+- When adding new holes or cuts, ensure cutting shapes extend beyond the target by at least 0.2 units.
+- Do not restructure working code unnecessarily — minimal changes reduce the chance of introducing geometry defects.
 `;
 
 export const VISION_PROMPT_SECTION = `
