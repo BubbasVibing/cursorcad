@@ -1,4 +1,4 @@
-import { primitives, booleans, transforms, geometries } from "@jscad/modeling";
+import { primitives, booleans, transforms, extrusions, geometries } from "@jscad/modeling";
 import type { Geom3 } from "@jscad/modeling/src/geometries/types";
 import type { JscadPart } from "@/lib/types";
 
@@ -14,6 +14,8 @@ const SANDBOX_PRIMITIVES = {
   rotate: transforms.rotate,
   scale: transforms.scale,
   mirror: transforms.mirror,
+  polygon: primitives.polygon,
+  extrudeRotate: extrusions.extrudeRotate,
 } as const;
 
 const PRIMITIVE_NAMES = Object.keys(SANDBOX_PRIMITIVES);
