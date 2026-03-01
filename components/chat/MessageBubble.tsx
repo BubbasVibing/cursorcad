@@ -11,13 +11,15 @@
  *   imageDataUrl -- optional image thumbnail (shown above text in user bubbles)
  */
 
+import { memo } from "react";
+
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
   imageDataUrl?: string;
 }
 
-export default function MessageBubble({ role, content, imageDataUrl }: MessageBubbleProps) {
+export default memo(function MessageBubble({ role, content, imageDataUrl }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -49,4 +51,4 @@ export default function MessageBubble({ role, content, imageDataUrl }: MessageBu
       </div>
     </div>
   );
-}
+});

@@ -3,20 +3,12 @@ import { SYSTEM_PROMPT, VISION_PROMPT_SECTION } from "@/prompts/system";
 import type { ConversationMessage, ImageAttachment } from "@/lib/types";
 
 /** Remove markdown fences if Claude accidentally wraps output */
-function stripFences(text: string): string {
+export function stripFences(text: string): string {
   return text.replace(/^```(?:\w*)\n?/, "").replace(/\n?```$/, "").trim();
 }
 
-export async function generateCode(
-  messages: ConversationMessage[],
-  currentCode?: string | null,
-  image?: ImageAttachment | null,
-): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-key-here") {
-    throw new Error("MISSING_API_KEY");
-  }
-
+/** Build the full system prompt, optionally appending current model code and vision section. */
+function buildSystemPrompt(currentCode?: string | null, hasImage?: boolean): string {
   let systemPrompt = SYSTEM_PROMPT;
 
   if (currentCode) {
@@ -33,14 +25,19 @@ ${currentCode}
 When the user asks for modifications, edit this code. Preserve existing structure, only change what's requested. Return the complete updated code.`;
   }
 
-  if (image) {
+  if (hasImage) {
     systemPrompt += VISION_PROMPT_SECTION;
   }
 
-  const client = new Anthropic({ apiKey });
+  return systemPrompt;
+}
 
-  /* Build messages, transforming the last user message to include image if present */
-  const apiMessages: Anthropic.MessageParam[] = messages.map((msg, i) => {
+/** Build Anthropic API messages, optionally adding an image to the last user message. */
+function buildApiMessages(
+  messages: ConversationMessage[],
+  image?: ImageAttachment | null,
+): Anthropic.MessageParam[] {
+  return messages.map((msg, i) => {
     if (image && msg.role === "user" && i === messages.length - 1) {
       return {
         role: "user" as const,
@@ -59,12 +56,25 @@ When the user asks for modifications, edit this code. Preserve existing structur
     }
     return { role: msg.role, content: msg.content };
   });
+}
+
+export async function generateCode(
+  messages: ConversationMessage[],
+  currentCode?: string | null,
+  image?: ImageAttachment | null,
+): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey === "your-key-here") {
+    throw new Error("MISSING_API_KEY");
+  }
+
+  const client = new Anthropic({ apiKey });
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: image ? 4096 : 2048,
-    system: systemPrompt,
-    messages: apiMessages,
+    system: buildSystemPrompt(currentCode, !!image),
+    messages: buildApiMessages(messages, image),
   });
 
   const textBlock = response.content.find((b) => b.type === "text");
@@ -78,4 +88,28 @@ When the user asks for modifications, edit this code. Preserve existing structur
   }
 
   return code;
+}
+
+/**
+ * Stream-based variant of generateCode.
+ * Returns the Anthropic MessageStream so the caller can attach event listeners.
+ */
+export function generateCodeStream(
+  messages: ConversationMessage[],
+  currentCode?: string | null,
+  image?: ImageAttachment | null,
+) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey === "your-key-here") {
+    throw new Error("MISSING_API_KEY");
+  }
+
+  const client = new Anthropic({ apiKey });
+
+  return client.messages.stream({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: image ? 4096 : 2048,
+    system: buildSystemPrompt(currentCode, !!image),
+    messages: buildApiMessages(messages, image),
+  });
 }

@@ -13,7 +13,7 @@
  * (which fetches code from the API) to the viewport (which renders it).
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import Viewport from "@/components/viewport/Viewport";
 
@@ -125,13 +125,23 @@ export default function Home() {
     };
   }, []);
 
+  const viewportEl = useMemo(
+    () => <Viewport jscadCode={jscadCode} modelDescription={lastPrompt} />,
+    [jscadCode, lastPrompt],
+  );
+
+  const chatPanelEl = useMemo(
+    () => <ChatPanel onCodeGenerated={setJscadCode} onGeneratingChange={setIsGenerating} currentCode={jscadCode} onPromptSent={setLastPrompt} />,
+    [jscadCode],
+  );
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#f7f7fb]">
       {/* ======================================
           Viewport -- Full-bleed background layer
           ====================================== */}
       <div className="absolute inset-0 z-0">
-        <Viewport jscadCode={jscadCode} isGenerating={isGenerating} modelDescription={lastPrompt} />
+        {viewportEl}
       </div>
 
       {/* ======================================
@@ -222,7 +232,7 @@ export default function Home() {
         />
 
         {/* ---- Chat panel content ---- */}
-        <ChatPanel onCodeGenerated={setJscadCode} onGeneratingChange={setIsGenerating} currentCode={jscadCode} onPromptSent={setLastPrompt} />
+        {chatPanelEl}
       </aside>
     </div>
   );
