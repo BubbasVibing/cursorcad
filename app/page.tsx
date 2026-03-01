@@ -243,18 +243,15 @@ export default function Home() {
     };
   }, []);
 
-  const viewportEl = useMemo(
-    () => (
-      <Viewport
-        jscadCode={jscadCode}
-        modelDescription={lastPrompt}
-        settings={settings}
-        leftSidebarOpen={leftSidebarOpen}
-        chatOpen={chatOpen}
-        panelWidth={panelWidth}
-      />
-    ),
-    [jscadCode, lastPrompt, settings, leftSidebarOpen, chatOpen, panelWidth],
+  const viewportEl = (
+    <Viewport
+      jscadCode={jscadCode}
+      modelDescription={lastPrompt}
+      settings={settings}
+      leftSidebarOpen={leftSidebarOpen}
+      chatOpen={chatOpen}
+      panelWidth={panelWidth}
+    />
   );
 
   const chatPanelEl = useMemo(
@@ -295,6 +292,7 @@ export default function Home() {
         onNewDesign={handleNewDesign}
         onSettingsChange={handleSettingsChange}
         historyLoading={historyLoading}
+        isAuthenticated={isAuthenticated}
       />
 
       {/* ======================================

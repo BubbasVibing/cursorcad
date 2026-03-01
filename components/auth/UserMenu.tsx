@@ -14,11 +14,11 @@ export default function UserMenu() {
     );
   }
 
-  if (!session) {
+  if (status === "unauthenticated" || !session) {
     return (
       <div className="px-4 py-3 border-t border-gray-200/60">
         <button
-          onClick={() => signIn()}
+          onClick={() => signIn("google")}
           className="
             flex w-full items-center justify-center gap-1.5
             bg-violet-500 text-white rounded-lg h-8

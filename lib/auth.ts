@@ -11,14 +11,10 @@ function getClientPromise() {
   const globalKey = "_mongoAuthClient" as const;
   const g = globalThis as unknown as Record<string, Promise<MongoClient>>;
 
-  if (process.env.NODE_ENV === "development") {
-    if (!g[globalKey]) {
-      g[globalKey] = new MongoClient(uri).connect();
-    }
-    return g[globalKey];
+  if (!g[globalKey]) {
+    g[globalKey] = new MongoClient(uri).connect();
   }
-
-  return new MongoClient(uri).connect();
+  return g[globalKey];
 }
 
 const clientPromise = getClientPromise();

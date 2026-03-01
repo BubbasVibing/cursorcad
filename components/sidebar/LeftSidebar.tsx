@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SessionListItem, CadSettings } from "@/lib/types";
 import HistoryPanel from "@/components/sidebar/HistoryPanel";
 import SettingsPanel from "@/components/sidebar/SettingsPanel";
@@ -17,6 +17,7 @@ interface LeftSidebarProps {
   onNewDesign: () => void;
   onSettingsChange: (settings: CadSettings) => void;
   historyLoading?: boolean;
+  isAuthenticated?: boolean;
 }
 
 export default function LeftSidebar({
@@ -29,8 +30,19 @@ export default function LeftSidebar({
   onNewDesign,
   onSettingsChange,
   historyLoading,
+  isAuthenticated = false,
 }: LeftSidebarProps) {
-  const [activeTab, setActiveTab] = useState<"history" | "settings">("history");
+  // Default to settings tab when not logged in (no history available)
+  const [activeTab, setActiveTab] = useState<"history" | "settings">(
+    isAuthenticated ? "history" : "settings"
+  );
+
+  // Switch to settings if user logs out while on history tab
+  useEffect(() => {
+    if (!isAuthenticated && activeTab === "history") {
+      setActiveTab("settings");
+    }
+  }, [isAuthenticated, activeTab]);
 
   return (
     <aside
@@ -93,41 +105,49 @@ export default function LeftSidebar({
         </button>
       </div>
 
-      {/* ---- Tab switcher ---- */}
-      <div className="mx-3 mb-2">
-        <div className="flex bg-gray-100 rounded-lg p-0.5">
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`
-              flex-1 py-1.5 text-xs font-medium rounded-md
-              transition-all duration-150
-              ${activeTab === "history"
-                ? "bg-white text-gray-800 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-              }
-            `}
-          >
-            History
-          </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`
-              flex-1 py-1.5 text-xs font-medium rounded-md
-              transition-all duration-150
-              ${activeTab === "settings"
-                ? "bg-white text-gray-800 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-              }
-            `}
-          >
-            Settings
-          </button>
+      {/* ---- Tab switcher (only show tabs when logged in) ---- */}
+      {isAuthenticated ? (
+        <div className="mx-3 mb-2">
+          <div className="flex bg-gray-100 rounded-lg p-0.5">
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`
+                flex-1 py-1.5 text-xs font-medium rounded-md
+                transition-all duration-150
+                ${activeTab === "history"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                }
+              `}
+            >
+              History
+            </button>
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={`
+                flex-1 py-1.5 text-xs font-medium rounded-md
+                transition-all duration-150
+                ${activeTab === "settings"
+                  ? "bg-white text-gray-800 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                }
+              `}
+            >
+              Settings
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="mx-3 mb-2">
+          <div className="text-[10px] text-gray-400 text-center py-1">
+            Sign in to save your designs
+          </div>
+        </div>
+      )}
 
       {/* ---- Tab content ---- */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "history" ? (
+        {isAuthenticated && activeTab === "history" ? (
           <HistoryPanel
             sessions={sessions}
             activeSessionId={activeSessionId}

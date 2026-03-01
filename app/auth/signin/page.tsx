@@ -4,22 +4,22 @@ import { signIn } from "next-auth/react";
 
 export default function SignInPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950">
-      <div className="w-full max-w-sm mx-auto">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-[#f7f7fb]">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(139,92,246,0.08),transparent_60%)]" />
+
+      <div className="relative w-full max-w-sm mx-auto px-4">
+        <div className="bg-white/70 backdrop-blur-xl border border-white/50 rounded-2xl p-8 shadow-2xl">
           {/* Logo / Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-violet-600/20 mb-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-7 h-7 text-violet-400"
-              >
-                <path d="M12.378 1.602a.75.75 0 00-.756 0L3 6.632l9 5.25 9-5.25-8.622-5.03zM21.75 7.93l-9 5.25v9l8.628-5.032a.75.75 0 00.372-.648V7.93zM11.25 22.18v-9l-9-5.25v8.57a.75.75 0 00.372.648l8.628 5.033z" />
-              </svg>
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-50 mb-4 overflow-hidden">
+              <img
+                src="/logo/logofavicon/cadoncrackfavicon.png"
+                alt="CadOnCrack logo"
+                className="h-12 w-12 object-cover scale-[1.6]"
+              />
             </div>
-            <h1 className="text-xl font-semibold text-white">CAD Cursor</h1>
+            <h1 className="text-xl font-semibold text-gray-800">CadOnCrack</h1>
             <p className="text-sm text-gray-400 mt-1">
               Sign in to save your designs
             </p>
@@ -30,9 +30,11 @@ export default function SignInPage() {
             onClick={() => signIn("google", { callbackUrl: "/" })}
             className="
               flex w-full items-center justify-center gap-3
-              bg-white text-gray-900 rounded-lg h-11
+              bg-white text-gray-700 rounded-xl h-11
               text-sm font-medium
-              hover:bg-gray-100 active:scale-[0.98]
+              border border-gray-200
+              shadow-sm
+              hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98]
               transition-all duration-150
               cursor-pointer
             "
@@ -62,14 +64,14 @@ export default function SignInPage() {
           <div className="mt-4 text-center">
             <a
               href="/"
-              className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
+              className="text-xs text-gray-400 hover:text-violet-500 transition-colors"
             >
               Continue without signing in
             </a>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
+        <p className="text-center text-xs text-gray-400 mt-6">
           Natural language to 3D print file
         </p>
       </div>
