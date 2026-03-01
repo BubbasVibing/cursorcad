@@ -90,11 +90,13 @@ export default function Home() {
   } = useConversations();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  /* Settings */
-  const [settings, setSettings] = useState<CadSettings>(() => {
-    if (typeof window === "undefined") return DEFAULT_SETTINGS;
-    return loadSettings();
-  });
+  /* Settings — always start with defaults to avoid hydration mismatch,
+     then load from localStorage in useEffect */
+  const [settings, setSettings] = useState<CadSettings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    setSettings(loadSettings());
+  }, []);
 
   /* Chat messages ref for session save/restore */
   const [chatMessages, setChatMessages] = useState<ConversationMessage[]>([]);
