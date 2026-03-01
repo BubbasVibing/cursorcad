@@ -1,17 +1,18 @@
 "use client";
 
 import { memo } from "react";
-import type { DesignSession } from "@/lib/types";
+import type { SessionListItem } from "@/lib/types";
 
 interface SessionCardProps {
-  session: DesignSession;
+  session: SessionListItem;
   isActive: boolean;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-function relativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
+function relativeTime(timestamp: number | string): string {
+  const ts = typeof timestamp === "string" ? new Date(timestamp).getTime() : timestamp;
+  const diff = Date.now() - ts;
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return "Just now";
   if (minutes < 60) return `${minutes}m ago`;
@@ -19,7 +20,7 @@ function relativeTime(timestamp: number): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
+  return new Date(ts).toLocaleDateString();
 }
 
 export default memo(function SessionCard({
@@ -28,10 +29,6 @@ export default memo(function SessionCard({
   onLoad,
   onDelete,
 }: SessionCardProps) {
-  const lastMessage = session.messages.length > 0
-    ? session.messages[session.messages.length - 1].content
-    : null;
-
   return (
     <button
       onClick={() => onLoad(session.id)}
@@ -53,13 +50,12 @@ export default memo(function SessionCard({
         </span>
       </div>
 
-      {lastMessage && (
+      {session.lastMessage && (
         <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-          {lastMessage}
+          {session.lastMessage}
         </p>
       )}
 
-      {/* Delete button on hover */}
       <button
         onClick={(e) => {
           e.stopPropagation();

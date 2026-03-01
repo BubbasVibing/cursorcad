@@ -36,6 +36,14 @@ export interface DesignSession {
   lastPrompt: string | null;
 }
 
+/** Lightweight session item for the history list (works for both localStorage and DB). */
+export interface SessionListItem {
+  id: string;
+  title: string;
+  lastMessage: string | null;
+  updatedAt: number | string;
+}
+
 /** User-configurable CAD settings persisted to localStorage. */
 export interface CadSettings {
   unitSystem: "mm" | "cm" | "in";

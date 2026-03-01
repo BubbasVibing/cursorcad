@@ -18,15 +18,17 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import Viewport from "@/components/viewport/Viewport";
 import LeftSidebar from "@/components/sidebar/LeftSidebar";
-import type { DesignSession, CadSettings, ConversationMessage } from "@/lib/types";
-import { loadSessions, saveSession, deleteSession as deleteSessionFromStore, generateSessionId } from "@/lib/session-store";
+import type { CadSettings, ConversationMessage } from "@/lib/types";
+import { generateSessionId } from "@/lib/session-store";
 import { loadSettings, saveSettings, DEFAULT_SETTINGS } from "@/lib/settings-store";
+import { useConversations } from "@/lib/hooks/useConversations";
 
 /* ---- Constants ---- */
 const MIN_PANEL_WIDTH = 320;
 const MAX_PANEL_WIDTH = 600;
 const DEFAULT_PANEL_WIDTH = 400;
-const EDGE_MARGIN = 20; /* px margin from viewport edges */
+const EDGE_MARGIN = 20; /* px horizontal margin from viewport edges */
+const EDGE_MARGIN_Y = 60; /* px vertical margin — shorter panels reveal viewport behind */
 
 /* ---- God Mode: pre-validated JSCAD for demo safety net (Cmd+Shift+G) ---- */
 const GOD_MODE_CODE = `
@@ -72,15 +74,21 @@ export default function Home() {
   const [showToggle, setShowToggle] = useState(false);
   const [showLeftToggle, setShowLeftToggle] = useState(false);
 
-  /* Left sidebar state */
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
+  /* Left sidebar state — open by default */
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
 
-  /* Session management */
+  /* Session management via useConversations hook (DB for authed, localStorage fallback) */
+  const {
+    conversations,
+    loading: historyLoading,
+    isAuthenticated,
+    createConversation,
+    loadConversation,
+    updateConversation,
+    deleteConversation,
+    fetchConversations,
+  } = useConversations();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<DesignSession[]>(() => {
-    if (typeof window === "undefined") return [];
-    return loadSessions();
-  });
 
   /* Settings */
   const [settings, setSettings] = useState<CadSettings>(() => {
@@ -106,36 +114,28 @@ export default function Home() {
     if (!jscadCode && chatMessages.length === 0) return;
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const sessionId = activeSessionId || generateSessionId();
-      if (!activeSessionId) setActiveSessionId(sessionId);
-
+    const delay = isAuthenticated ? 3000 : 1000;
+    saveTimerRef.current = setTimeout(async () => {
       const title = lastPrompt
         ? lastPrompt.slice(0, 60)
         : "Untitled Design";
 
-      const session: DesignSession = {
-        id: sessionId,
-        title,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        messages: chatMessages,
-        jscadCode,
-        lastPrompt,
-      };
+      const data = { title, messages: chatMessages, jscadCode, lastPrompt };
 
-      // Preserve createdAt from existing session
-      const existing = sessions.find((s) => s.id === sessionId);
-      if (existing) session.createdAt = existing.createdAt;
-
-      saveSession(session);
-      setSessions(loadSessions());
-    }, 1000);
+      if (activeSessionId) {
+        await updateConversation(activeSessionId, data);
+      } else {
+        const newId = await createConversation(data);
+        setActiveSessionId(newId);
+      }
+      if (isAuthenticated) fetchConversations();
+    }, delay);
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [jscadCode, chatMessages, lastPrompt, activeSessionId, sessions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jscadCode, chatMessages, lastPrompt, activeSessionId, isAuthenticated]);
 
   /* ---- Settings change handler ---- */
   const handleSettingsChange = useCallback((newSettings: CadSettings) => {
@@ -153,25 +153,24 @@ export default function Home() {
   }, []);
 
   /* ---- Load Session ---- */
-  const handleLoadSession = useCallback((id: string) => {
-    const session = sessions.find((s) => s.id === id);
+  const handleLoadSession = useCallback(async (id: string) => {
+    const session = await loadConversation(id);
     if (!session) return;
 
-    setActiveSessionId(session.id);
+    setActiveSessionId(id);
     setJscadCode(session.jscadCode);
     setLastPrompt(session.lastPrompt);
     setChatMessages(session.messages);
     setChatKey((k) => k + 1);
-  }, [sessions]);
+  }, [loadConversation]);
 
   /* ---- Delete Session ---- */
-  const handleDeleteSession = useCallback((id: string) => {
-    deleteSessionFromStore(id);
-    setSessions(loadSessions());
+  const handleDeleteSession = useCallback(async (id: string) => {
+    await deleteConversation(id);
     if (activeSessionId === id) {
       setActiveSessionId(null);
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, deleteConversation]);
 
   /* ---- Chat messages change callback ---- */
   const handleMessagesChange = useCallback((messages: ConversationMessage[]) => {
@@ -288,13 +287,14 @@ export default function Home() {
       <LeftSidebar
         open={leftSidebarOpen}
         onToggle={() => setLeftSidebarOpen((prev) => !prev)}
-        sessions={sessions}
+        sessions={conversations}
         activeSessionId={activeSessionId}
         settings={settings}
         onLoadSession={handleLoadSession}
         onDeleteSession={handleDeleteSession}
         onNewDesign={handleNewDesign}
         onSettingsChange={handleSettingsChange}
+        historyLoading={historyLoading}
       />
 
       {/* ======================================
@@ -422,9 +422,9 @@ export default function Home() {
           ${chatOpen ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"}
         `}
         style={{
-          top: EDGE_MARGIN,
+          top: EDGE_MARGIN_Y,
           right: EDGE_MARGIN,
-          bottom: EDGE_MARGIN,
+          bottom: EDGE_MARGIN_Y,
           width: panelWidth,
         }}
       >

@@ -1,13 +1,14 @@
 "use client";
 
-import type { DesignSession } from "@/lib/types";
+import type { SessionListItem } from "@/lib/types";
 import SessionCard from "@/components/sidebar/SessionCard";
 
 interface HistoryPanelProps {
-  sessions: DesignSession[];
+  sessions: SessionListItem[];
   activeSessionId: string | null;
   onLoadSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  loading?: boolean;
 }
 
 export default function HistoryPanel({
@@ -15,7 +16,21 @@ export default function HistoryPanel({
   activeSessionId,
   onLoadSession,
   onDeleteSession,
+  loading,
 }: HistoryPanelProps) {
+  if (loading) {
+    return (
+      <div className="space-y-2 px-3 py-3">
+        {[...Array(3)].map((_, i) => (
+          <div
+            key={i}
+            className="h-14 rounded-lg bg-gray-100 animate-pulse"
+          />
+        ))}
+      </div>
+    );
+  }
+
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">

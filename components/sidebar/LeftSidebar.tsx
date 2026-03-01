@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import type { DesignSession, CadSettings } from "@/lib/types";
+import type { SessionListItem, CadSettings } from "@/lib/types";
 import HistoryPanel from "@/components/sidebar/HistoryPanel";
 import SettingsPanel from "@/components/sidebar/SettingsPanel";
+import UserMenu from "@/components/auth/UserMenu";
 
 interface LeftSidebarProps {
   open: boolean;
   onToggle: () => void;
-  sessions: DesignSession[];
+  sessions: SessionListItem[];
   activeSessionId: string | null;
   settings: CadSettings;
   onLoadSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   onNewDesign: () => void;
   onSettingsChange: (settings: CadSettings) => void;
+  historyLoading?: boolean;
 }
 
 export default function LeftSidebar({
@@ -26,6 +28,7 @@ export default function LeftSidebar({
   onDeleteSession,
   onNewDesign,
   onSettingsChange,
+  historyLoading,
 }: LeftSidebarProps) {
   const [activeTab, setActiveTab] = useState<"history" | "settings">("history");
 
@@ -41,9 +44,9 @@ export default function LeftSidebar({
         ${open ? "translate-x-0 opacity-100" : "-translate-x-[120%] opacity-0 pointer-events-none"}
       `}
       style={{
-        top: 20,
+        top: 60,
         left: 20,
-        bottom: 20,
+        bottom: 60,
         width: 280,
       }}
     >
@@ -130,6 +133,7 @@ export default function LeftSidebar({
             activeSessionId={activeSessionId}
             onLoadSession={onLoadSession}
             onDeleteSession={onDeleteSession}
+            loading={historyLoading}
           />
         ) : (
           <SettingsPanel
@@ -138,6 +142,9 @@ export default function LeftSidebar({
           />
         )}
       </div>
+
+      {/* ---- User menu ---- */}
+      <UserMenu />
     </aside>
   );
 }
