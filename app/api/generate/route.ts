@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCodeStream, stripFences } from "@/lib/claude";
+import { expandPrompt } from "@/lib/prompt-expander";
 import type { ConversationMessage, ImageAttachment } from "@/lib/types";
 
 const ALLOWED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages, currentCode, imageBase64, imageMediaType } = body as {
+  let { messages, currentCode, imageBase64, imageMediaType } = body as {
     messages: ConversationMessage[];
     currentCode?: string | null;
     imageBase64?: string;
@@ -56,6 +57,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Expand the last user message through the prompt expander pipeline
+    const lastMessage = messages[messages.length - 1];
+    const expanded = expandPrompt(lastMessage.content);
+    if (expanded.wasExpanded) {
+      messages = messages.map((msg, i) =>
+        i === messages.length - 1 ? { ...msg, content: expanded.text } : msg
+      );
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[prompt-expander] Original:', lastMessage.content);
+        console.log('[prompt-expander] Expanded:', expanded.text);
+      }
+    }
+
     const stream = generateCodeStream(messages, currentCode, image);
 
     const encoder = new TextEncoder();
