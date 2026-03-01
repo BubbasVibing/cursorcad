@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import GitHub from "next-auth/providers/github";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import { MongoClient } from "mongodb";
 
@@ -27,7 +26,7 @@ function getClientPromise(): Promise<MongoClient> {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: MongoDBAdapter(getClientPromise()),
-  providers: [Google, GitHub],
+  providers: [Google],
   session: { strategy: "jwt" },
   callbacks: {
     jwt({ token, user }) {
