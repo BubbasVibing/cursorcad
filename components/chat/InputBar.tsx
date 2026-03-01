@@ -16,7 +16,7 @@
  *   - Violet-500 send button and focus ring
  */
 
-import { useRef, useState, useCallback, type KeyboardEvent } from "react";
+import { useRef, useState, useCallback, memo, type KeyboardEvent } from "react";
 
 export interface ImageData {
   base64: string;
@@ -70,7 +70,7 @@ function resizeImage(dataUrl: string): Promise<{ base64: string; dataUrl: string
   });
 }
 
-export default function InputBar({ onSend, disabled = false }: InputBarProps) {
+export default memo(function InputBar({ onSend, disabled = false }: InputBarProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,4 +302,4 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
       </div>
     </div>
   );
-}
+});
