@@ -38,6 +38,15 @@ export function runJscad(code: string): JscadResult {
 
     // Single geom3 → wrap as one-part array
     if (geometries.geom3.isA(result)) {
+      const polys = geometries.geom3.toPolygons(result as Geom3);
+      if (polys.length === 0) {
+        const emptyResult: JscadResult = {
+          ok: false,
+          error: "Generated geometry has no polygons — boolean operations may have cancelled out completely. Ensure subtracted shapes don't consume the entire base.",
+        };
+        cacheResult(code, emptyResult);
+        return emptyResult;
+      }
       const okResult: JscadResult = { ok: true, parts: [{ geometry: result as Geom3 }] };
       cacheResult(code, okResult);
       return okResult;
@@ -54,6 +63,13 @@ export function runJscad(code: string): JscadResult {
           return {
             ok: false,
             error: `Array element [${i}] is not a valid geom3 object. Each element must be a geom3 or { geometry: geom3, color?: string, name?: string }.`,
+          };
+        }
+        const partPolys = geometries.geom3.toPolygons(geom as Geom3);
+        if (partPolys.length === 0) {
+          return {
+            ok: false,
+            error: `Part [${i}]${item?.name ? ` ("${item.name}")` : ""} has no polygons — boolean operations may have cancelled out completely.`,
           };
         }
         parts.push({
