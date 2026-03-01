@@ -17,6 +17,8 @@
  */
 
 import { useRef, useState, useCallback, memo, type KeyboardEvent } from "react";
+import { resizeImage } from "@/lib/image-utils";
+import CameraModal from "./CameraModal";
 
 export interface ImageData {
   base64: string;
@@ -30,45 +32,7 @@ interface InputBarProps {
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const MAX_IMAGE_DIMENSION = 1024;
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-/**
- * Resize an image to fit within MAX_IMAGE_DIMENSION on its longest edge,
- * then re-encode as JPEG base64.
- */
-function resizeImage(dataUrl: string): Promise<{ base64: string; dataUrl: string }> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
-        if (width > height) {
-          height = Math.round((height * MAX_IMAGE_DIMENSION) / width);
-          width = MAX_IMAGE_DIMENSION;
-        } else {
-          width = Math.round((width * MAX_IMAGE_DIMENSION) / height);
-          height = MAX_IMAGE_DIMENSION;
-        }
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Could not get canvas context"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      const base64 = resizedDataUrl.split(",")[1];
-      resolve({ base64, dataUrl: resizedDataUrl });
-    };
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = dataUrl;
-  });
-}
 
 export default memo(function InputBar({ onSend, disabled = false }: InputBarProps) {
   const [value, setValue] = useState("");
@@ -78,6 +42,7 @@ export default memo(function InputBar({ onSend, disabled = false }: InputBarProp
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageMediaType, setImageMediaType] = useState<string | null>(null);
+  const [showCamera, setShowCamera] = useState(false);
 
   /* ---- Auto-resize the textarea to fit content ---- */
   const resize = useCallback(() => {
@@ -93,6 +58,14 @@ export default memo(function InputBar({ onSend, disabled = false }: InputBarProp
     setImageBase64(null);
     setImageMediaType(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  /* ---- Handle camera capture ---- */
+  const handleCameraCapture = useCallback((img: ImageData) => {
+    setImagePreview(img.dataUrl);
+    setImageBase64(img.base64);
+    setImageMediaType(img.mediaType);
+    setShowCamera(false);
   }, []);
 
   /* ---- Handle file selection ---- */
@@ -236,15 +209,47 @@ export default memo(function InputBar({ onSend, disabled = false }: InputBarProp
           className="hidden"
         />
 
-        {/* Camera icon button */}
+        {/* Upload image button */}
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          aria-label="Attach image"
+          aria-label="Upload image"
           className="
             flex h-8 w-8 shrink-0 items-center justify-center
             rounded-lg transition-all duration-150
-            text-gray-400 hover:text-violet-500
+            bg-gray-200 text-gray-500
+            hover:bg-gray-300 hover:text-gray-600
+            disabled:opacity-50 disabled:cursor-not-allowed
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500
+          "
+        >
+          {/* Photo/image icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="h-4.5 w-4.5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21zm14.25-12a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
+            />
+          </svg>
+        </button>
+
+        {/* Camera button */}
+        <button
+          onClick={() => setShowCamera(true)}
+          disabled={disabled}
+          aria-label="Open camera"
+          className="
+            flex h-8 w-8 shrink-0 items-center justify-center
+            rounded-lg transition-all duration-150
+            bg-gray-200 text-gray-500
+            hover:bg-gray-300 hover:text-gray-600
             disabled:opacity-50 disabled:cursor-not-allowed
             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500
           "
@@ -255,7 +260,7 @@ export default memo(function InputBar({ onSend, disabled = false }: InputBarProp
             fill="none"
             stroke="currentColor"
             strokeWidth="1.5"
-            className="h-5 w-5"
+            className="h-4.5 w-4.5"
           >
             <path
               strokeLinecap="round"
@@ -300,6 +305,12 @@ export default memo(function InputBar({ onSend, disabled = false }: InputBarProp
           </svg>
         </button>
       </div>
+
+      <CameraModal
+        open={showCamera}
+        onCapture={handleCameraCapture}
+        onClose={() => setShowCamera(false)}
+      />
     </div>
   );
 });
