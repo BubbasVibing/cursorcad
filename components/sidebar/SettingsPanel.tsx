@@ -48,15 +48,15 @@ function ToggleSwitch({
     <button
       onClick={() => onChange(!checked)}
       className={`
-        relative w-8 h-[18px] rounded-full transition-colors duration-200
+        relative w-9 h-5 rounded-full transition-colors duration-200
         ${checked ? "bg-violet-500" : "bg-gray-200"}
       `}
     >
       <span
         className={`
-          absolute top-[2px] w-3.5 h-3.5 rounded-full bg-white shadow-sm
+          absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm
           transition-transform duration-200
-          ${checked ? "translate-x-[14px]" : "translate-x-[2px]"}
+          ${checked ? "translate-x-4" : "translate-x-0"}
         `}
       />
     </button>
@@ -145,16 +145,6 @@ export default function SettingsPanel({
         />
       </SettingRow>
 
-      <SettingRow label="Grid Density">
-        <Stepper
-          value={settings.gridDensity}
-          min={10}
-          max={100}
-          step={5}
-          onChange={(v) => update({ gridDensity: v })}
-        />
-      </SettingRow>
-
       <SettingRow label="Segments">
         <Stepper
           value={settings.defaultSegments}
@@ -162,24 +152,6 @@ export default function SettingsPanel({
           max={64}
           step={8}
           onChange={(v) => update({ defaultSegments: v })}
-        />
-      </SettingRow>
-
-      <SettingRow label="Export Format">
-        <PillToggle
-          options={[
-            { label: "STL", value: "stl" as const },
-            { label: "3MF", value: "3mf" as const },
-          ]}
-          value={settings.exportFormat}
-          onChange={(v) => update({ exportFormat: v })}
-        />
-      </SettingRow>
-
-      <SettingRow label="Snap to Grid">
-        <ToggleSwitch
-          checked={settings.snapToGrid}
-          onChange={(v) => update({ snapToGrid: v })}
         />
       </SettingRow>
 
