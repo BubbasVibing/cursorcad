@@ -1,32 +1,33 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
-import { MongoClient } from "mongodb";
+import type { NextAuthConfig } from "next-auth";
 
-function getClientPromise(): Promise<MongoClient> {
-  const uri = process.env.MONGODB_URI;
-  if (!uri) {
-    // Return a promise that never resolves during build —
-    // auth routes won't be called without a real DB anyway.
-    return new Promise(() => {});
-  }
+const hasMongoDb = !!process.env.MONGODB_URI;
 
+async function getAdapter() {
+  if (!hasMongoDb) return undefined;
+  const { MongoDBAdapter } = await import("@auth/mongodb-adapter");
+  const { MongoClient } = await import("mongodb");
+
+  const uri = process.env.MONGODB_URI!;
   const globalKey = "_mongoAuthClient" as const;
-  const g = globalThis as unknown as Record<string, Promise<MongoClient>>;
+  const g = globalThis as unknown as Record<string, Promise<InstanceType<typeof MongoClient>>>;
 
+  let clientPromise: Promise<InstanceType<typeof MongoClient>>;
   if (process.env.NODE_ENV === "development") {
     if (!g[globalKey]) {
       g[globalKey] = new MongoClient(uri).connect();
     }
-    return g[globalKey];
+    clientPromise = g[globalKey];
+  } else {
+    clientPromise = new MongoClient(uri).connect();
   }
 
-  return new MongoClient(uri).connect();
+  return MongoDBAdapter(clientPromise);
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: MongoDBAdapter(getClientPromise()),
+const config: NextAuthConfig = {
   providers: [Google, GitHub],
   session: { strategy: "jwt" },
   callbacks: {
@@ -41,4 +42,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-});
+};
+
+// Only attach the MongoDB adapter if MONGODB_URI is configured
+if (hasMongoDb) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (config as any).adapter = getAdapter();
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(config);
