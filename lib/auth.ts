@@ -1,33 +1,32 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import type { NextAuthConfig } from "next-auth";
+import { MongoDBAdapter } from "@auth/mongodb-adapter";
+import { MongoClient } from "mongodb";
 
-const hasMongoDb = !!process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI;
 
-async function getAdapter() {
-  if (!hasMongoDb) return undefined;
-  const { MongoDBAdapter } = await import("@auth/mongodb-adapter");
-  const { MongoClient } = await import("mongodb");
+function getClientPromise() {
+  if (!uri) return null;
 
-  const uri = process.env.MONGODB_URI!;
   const globalKey = "_mongoAuthClient" as const;
-  const g = globalThis as unknown as Record<string, Promise<InstanceType<typeof MongoClient>>>;
+  const g = globalThis as unknown as Record<string, Promise<MongoClient>>;
 
-  let clientPromise: Promise<InstanceType<typeof MongoClient>>;
   if (process.env.NODE_ENV === "development") {
     if (!g[globalKey]) {
       g[globalKey] = new MongoClient(uri).connect();
     }
-    clientPromise = g[globalKey];
-  } else {
-    clientPromise = new MongoClient(uri).connect();
+    return g[globalKey];
   }
 
-  return MongoDBAdapter(clientPromise);
+  return new MongoClient(uri).connect();
 }
 
-const config: NextAuthConfig = {
+const clientPromise = getClientPromise();
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...(clientPromise ? { adapter: MongoDBAdapter(clientPromise) } : {}),
   providers: [Google],
+  pages: { signIn: "/auth/signin" },
   session: { strategy: "jwt" },
   callbacks: {
     jwt({ token, user }) {
@@ -41,12 +40,4 @@ const config: NextAuthConfig = {
       return session;
     },
   },
-};
-
-// Only attach the MongoDB adapter if MONGODB_URI is configured
-if (hasMongoDb) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (config as any).adapter = getAdapter();
-}
-
-export const { handlers, auth, signIn, signOut } = NextAuth(config);
+});
