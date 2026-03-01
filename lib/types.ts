@@ -24,3 +24,24 @@ export interface ThreePart {
   color?: string;
   name?: string;
 }
+
+/** A saved design session persisted to localStorage. */
+export interface DesignSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ConversationMessage[];
+  jscadCode: string | null;
+  lastPrompt: string | null;
+}
+
+/** User-configurable CAD settings persisted to localStorage. */
+export interface CadSettings {
+  unitSystem: "mm" | "cm" | "in";
+  gridDensity: number;
+  defaultSegments: number;
+  exportFormat: "stl" | "3mf";
+  snapToGrid: boolean;
+  showGrid: boolean;
+}

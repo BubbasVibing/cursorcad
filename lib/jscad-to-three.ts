@@ -1,21 +1,18 @@
 import { geometries } from "@jscad/modeling";
 import { BufferGeometry, Float32BufferAttribute } from "three";
+import { mergeVertices, toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Geom3 } from "@jscad/modeling/src/geometries/types";
 import type { JscadPart, ThreePart } from "@/lib/types";
 
-/** Convert a single JSCAD geom3 to a Three.js BufferGeometry with smooth normals. */
+/** Crease angle (radians): edges sharper than this get hard normals. */
+const CREASE_ANGLE = Math.PI / 6; // 30 degrees
+
+/** Convert a single JSCAD geom3 to a Three.js BufferGeometry with creased normals. */
 export function jscadToThree(geom: Geom3): BufferGeometry {
   const polygons = geometries.geom3.toPolygons(geom);
 
-  // Pass 1: count total triangles for pre-allocation
-  let triCount = 0;
-  for (const poly of polygons) {
-    triCount += poly.vertices.length - 2;
-  }
-
-  // Pass 2: fill pre-allocated Float32Array with indexed writes
-  const positions = new Float32Array(triCount * 9);
-  let offset = 0;
+  // Collect valid (non-degenerate) triangle positions
+  const buf: number[] = [];
 
   for (const poly of polygons) {
     const verts = poly.vertices;
@@ -25,20 +22,28 @@ export function jscadToThree(geom: Geom3): BufferGeometry {
       const b = verts[i];
       const c = verts[i + 1];
 
-      positions[offset++] = a[0]; positions[offset++] = a[1]; positions[offset++] = a[2];
-      positions[offset++] = b[0]; positions[offset++] = b[1]; positions[offset++] = b[2];
-      positions[offset++] = c[0]; positions[offset++] = c[1]; positions[offset++] = c[2];
+      // Skip degenerate triangles (near-zero area)
+      const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2];
+      const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2];
+      const cx = aby * acz - abz * acy;
+      const cy = abz * acx - abx * acz;
+      const cz = abx * acy - aby * acx;
+      if (cx * cx + cy * cy + cz * cz < 1e-14) continue;
+
+      buf.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
     }
   }
 
   const geometry = new BufferGeometry();
-  geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("position", new Float32BufferAttribute(new Float32Array(buf), 3));
   geometry.computeVertexNormals();
 
-  return geometry;
+  // toCreasedNormals: smooth normals on gentle curves, hard edges on sharp angles
+  const creased = toCreasedNormals(geometry, CREASE_ANGLE);
+  return mergeVertices(creased);
 }
 
-/** Convert an array of JscadParts to ThreeParts with smooth normals. */
+/** Convert an array of JscadParts to ThreeParts with creased normals. */
 export function jscadPartsToThree(parts: JscadPart[]): ThreePart[] {
   return parts.map((part) => ({
     geometry: jscadToThree(part.geometry),

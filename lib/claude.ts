@@ -72,7 +72,7 @@ export async function generateCode(
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
-    max_tokens: image ? 4096 : 2048,
+    max_tokens: 4096,
     system: buildSystemPrompt(currentCode, !!image),
     messages: buildApiMessages(messages, image),
   });
@@ -108,7 +108,7 @@ export function generateCodeStream(
 
   return client.messages.stream({
     model: "claude-sonnet-4-5-20250929",
-    max_tokens: image ? 4096 : 2048,
+    max_tokens: 4096,
     system: buildSystemPrompt(currentCode, !!image),
     messages: buildApiMessages(messages, image),
   });

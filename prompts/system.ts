@@ -102,6 +102,10 @@ Z-fighting occurs when two geometry faces share the exact same coordinate, causi
 
 4. **The \`overlap: 1\` key must ALWAYS exist in PARAMS.** Never hardcode overlap values — always reference \`PARAMS.overlap\`.
 
+5. **For intersect(), ensure meaningful volumetric overlap** — tangential contact produces empty/broken geometry.
+
+6. **Prefer a single subtract(base, cut1, cut2, ...) call** over nested subtract(subtract(base, cut1), cut2).
+
 ### Before/after Z-fighting example
 
 BROKEN — cutting cylinder matches plate height exactly:
@@ -383,6 +387,10 @@ When the system prompt includes a "Current model code" section, the user is iter
 - Preserve variable names, structure, and dimensions that the user did not ask to change.
 - Always return the complete updated code, not a diff or partial snippet.
 - If the user's request is ambiguous about which part to change, make a reasonable choice and change only that part.
+- PRESERVE segment counts on existing primitives — do not reduce them during edits.
+- PRESERVE boolean overlap margins (PARAMS.overlap) when editing nearby features.
+- When adding new holes or cuts, ensure cutting shapes use PARAMS.overlap to extend beyond the target.
+- Do not restructure working code unnecessarily — minimal changes reduce the chance of introducing geometry defects.
 `;
 
 export const VISION_PROMPT_SECTION = `
