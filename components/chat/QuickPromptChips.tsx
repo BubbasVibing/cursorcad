@@ -11,6 +11,8 @@
  *   onSelect -- optional callback fired when a chip is clicked
  */
 
+import { memo } from "react";
+
 const PROMPTS = [
   "Simple box with lid",
   "Phone stand",
@@ -24,7 +26,7 @@ interface QuickPromptChipsProps {
   onSelect?: (prompt: string) => void;
 }
 
-export default function QuickPromptChips({ onSelect }: QuickPromptChipsProps) {
+export default memo(function QuickPromptChips({ onSelect }: QuickPromptChipsProps) {
   const handleClick = (prompt: string) => {
     if (onSelect) {
       onSelect(prompt);
@@ -51,4 +53,4 @@ export default function QuickPromptChips({ onSelect }: QuickPromptChipsProps) {
       ))}
     </div>
   );
-}
+});

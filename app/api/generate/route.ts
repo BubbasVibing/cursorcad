@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateCode } from "@/lib/claude";
+import { generateCodeStream, stripFences } from "@/lib/claude";
 import type { ConversationMessage } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
@@ -30,8 +30,45 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const code = await generateCode(messages, currentCode);
-    return NextResponse.json({ code });
+    const stream = generateCodeStream(messages, currentCode);
+
+    const encoder = new TextEncoder();
+    let fullText = "";
+
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          stream.on("text", (textDelta: string) => {
+            fullText += textDelta;
+            const line = JSON.stringify({ type: "delta", text: textDelta }) + "\n";
+            controller.enqueue(encoder.encode(line));
+          });
+
+          await stream.finalMessage();
+
+          const cleanedCode = stripFences(fullText);
+          const doneLine = JSON.stringify({ type: "done", code: cleanedCode }) + "\n";
+          controller.enqueue(encoder.encode(doneLine));
+          controller.close();
+        } catch (err) {
+          console.error("[generate] stream error:", err);
+          const errorLine = JSON.stringify({
+            type: "error",
+            error: err instanceof Error ? err.message : "Stream failed",
+          }) + "\n";
+          controller.enqueue(encoder.encode(errorLine));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/x-ndjson",
+        "Cache-Control": "no-cache",
+      },
+    });
   } catch (err) {
     console.error("[generate] error:", err);
 

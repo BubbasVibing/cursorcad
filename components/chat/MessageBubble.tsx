@@ -10,12 +10,14 @@
  *   content -- the plain-text message body
  */
 
+import { memo } from "react";
+
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
 }
 
-export default function MessageBubble({ role, content }: MessageBubbleProps) {
+export default memo(function MessageBubble({ role, content }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -39,4 +41,4 @@ export default function MessageBubble({ role, content }: MessageBubbleProps) {
       </div>
     </div>
   );
-}
+});

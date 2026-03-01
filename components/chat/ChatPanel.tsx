@@ -12,14 +12,15 @@
  * gray text hierarchy. The parent island container provides the glass blur,
  * so this component uses transparent/translucent backgrounds.
  *
- * Calls /api/generate to get JSCAD code from Claude, then notifies
- * the parent via onCodeGenerated so the Viewport can render the model.
+ * Streams code from /api/generate in real-time, displaying it in a
+ * CodeStreamSnippet. After validation, notifies the parent via
+ * onCodeGenerated so the Viewport can render the model.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import InputBar from "@/components/chat/InputBar";
 import MessageBubble from "@/components/chat/MessageBubble";
-import TypingIndicator from "@/components/chat/TypingIndicator";
+import CodeStreamSnippet from "@/components/chat/CodeStreamSnippet";
 import QuickPromptChips from "@/components/chat/QuickPromptChips";
 import { runJscad } from "@/lib/jscad-runner";
 import type { ConversationMessage } from "@/lib/types";
@@ -48,6 +49,46 @@ Please fix the code. Remember:
 - Output raw code only, no markdown fences or explanation`;
 }
 
+/**
+ * Parse NDJSON from a ReadableStream, calling onLine for each parsed JSON object.
+ * Handles partial lines that split across chunks.
+ */
+async function readNDJSON(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onLine: (data: { type: string; text?: string; code?: string; error?: string }) => void,
+): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        onLine(JSON.parse(trimmed));
+      } catch {
+        console.warn("[ChatPanel] Failed to parse NDJSON line:", trimmed);
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    try {
+      onLine(JSON.parse(buffer.trim()));
+    } catch {
+      console.warn("[ChatPanel] Failed to parse final NDJSON buffer:", buffer);
+    }
+  }
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -66,6 +107,11 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  /* Streaming state */
+  const [streamingCode, setStreamingCode] = useState<string | null>(null);
+  const [streamStatus, setStreamStatus] = useState<"thinking" | "streaming" | "validating" | "retrying">("thinking");
+  const [streamAttempt, setStreamAttempt] = useState(1);
+
   /** Conversation history sent to Claude (separate from UI messages). */
   const conversationRef = useRef<ConversationMessage[]>([]);
 
@@ -76,10 +122,19 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, isGenerating]);
+  }, [messages]);
 
-  /* ---- Handle sending a message (with retry loop) ---- */
-  const handleSend = async (content: string) => {
+  /* Scroll when streaming code updates */
+  useEffect(() => {
+    if (streamingCode === null) return;
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }, [streamingCode]);
+
+  /* ---- Handle sending a message (with streaming + retry loop) ---- */
+  const handleSend = useCallback(async (content: string) => {
     /* Prevent rapid double-sends */
     if (sendingRef.current) return;
     sendingRef.current = true;
@@ -101,21 +156,30 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
     /* Detect if this is an edit (model already exists in viewport) */
     const isEdit = !!currentCode;
 
+    /* Initialize streaming UI */
+    setStreamingCode("");
+    setStreamStatus("thinking");
+    setStreamAttempt(1);
+
     try {
       let lastError = "";
       let lastFailedCode = "";
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        /* Build the messages array for this attempt.
-         * First attempt: use conversationRef as-is.
-         * Retries: append the failed code + retry prompt as temporary messages
-         * WITHOUT persisting to conversationRef. */
+        setStreamAttempt(attempt);
+
+        if (attempt > 1) {
+          setStreamingCode("");
+          setStreamStatus("retrying");
+          await new Promise((r) => setTimeout(r, 800));
+          setStreamStatus("thinking");
+        }
+
         let attemptMessages: ConversationMessage[];
 
         if (attempt === 1) {
           attemptMessages = [...conversationRef.current];
         } else {
-          /* Temporary messages for retry — not persisted */
           attemptMessages = [
             ...conversationRef.current,
             { role: "assistant", content: lastFailedCode },
@@ -123,40 +187,28 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
           ];
         }
 
-        /* 1. Call /api/generate */
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ messages: attemptMessages, currentCode }),
         });
 
-        let data;
-        try {
-          data = await res.json();
-        } catch {
-          /* Response wasn't JSON (e.g. HTML 502/504 from gateway) */
-          const assistantMsg: Message = {
-            id: `msg-${Date.now()}`,
-            role: "assistant",
-            content: "Error: Server returned an unexpected response. Please try again.",
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-          conversationRef.current.push({
-            role: "assistant",
-            content: "I was unable to generate valid code for that request.",
-          });
-          return;
-        }
-
-        /* 2. API error — show error, no retry */
+        /* Non-streaming error responses (400, 500, etc.) */
         if (!res.ok) {
+          let data;
+          try {
+            data = await res.json();
+          } catch {
+            data = { error: "Server returned an unexpected response" };
+          }
+
+          setStreamingCode(null);
           const assistantMsg: Message = {
             id: `msg-${Date.now()}`,
             role: "assistant",
             content: `Error: ${data.error || "Something went wrong"}`,
           };
           setMessages((prev) => [...prev, assistantMsg]);
-          /* Persist failure to maintain alternation */
           conversationRef.current.push({
             role: "assistant",
             content: "I was unable to generate valid code for that request.",
@@ -164,16 +216,71 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
           return;
         }
 
-        /* 3. Validate code in sandbox */
-        const result = runJscad(data.code);
+        /* Stream the response */
+        const reader = res.body?.getReader();
+        if (!reader) {
+          setStreamingCode(null);
+          const assistantMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: "Error: No response stream available.",
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          conversationRef.current.push({
+            role: "assistant",
+            content: "I was unable to generate valid code for that request.",
+          });
+          return;
+        }
 
-        /* 4. Success — notify parent and show message */
+        let finalCode: string | null = null;
+        let streamError: string | null = null;
+        let accumulatedCode = "";
+
+        await readNDJSON(reader, (data) => {
+          if (data.type === "delta" && data.text) {
+            accumulatedCode += data.text;
+            setStreamingCode(accumulatedCode);
+            setStreamStatus("streaming");
+          } else if (data.type === "done" && data.code) {
+            finalCode = data.code;
+          } else if (data.type === "error") {
+            streamError = data.error ?? "Unknown stream error";
+          }
+        });
+
+        /* Handle stream-level errors */
+        if (streamError) {
+          setStreamingCode(null);
+          const assistantMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: `Error: ${streamError}`,
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          conversationRef.current.push({
+            role: "assistant",
+            content: "I was unable to generate valid code for that request.",
+          });
+          return;
+        }
+
+        if (!finalCode) {
+          finalCode = accumulatedCode;
+        }
+
+        /* Validate in sandbox */
+        setStreamStatus("validating");
+        const result = runJscad(finalCode);
+
         if (result.ok) {
-          onCodeGenerated?.(data.code);
+          onCodeGenerated?.(finalCode);
 
           if (attempt > 1) {
             console.log(`[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} succeeded after retry`);
           }
+
+          setStreamingCode(null);
 
           const label = isEdit ? "Model updated" : "Model generated";
           const assistantMsg: Message = {
@@ -185,20 +292,20 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
                 : `${label} after ${attempt} attempts — check the viewport.`,
           };
           setMessages((prev) => [...prev, assistantMsg]);
-          /* Persist the actual code as assistant turn */
-          conversationRef.current.push({ role: "assistant", content: data.code });
+          conversationRef.current.push({ role: "assistant", content: finalCode });
           return;
         }
 
-        /* 5. Sandbox error — log and prepare for retry */
+        /* Sandbox error — prepare for retry */
         lastError = result.error;
-        lastFailedCode = data.code;
+        lastFailedCode = finalCode;
         console.warn(
           `[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} failed sandbox validation: ${result.error}`,
         );
       }
 
       /* All attempts exhausted */
+      setStreamingCode(null);
       console.error(`[ChatPanel] All ${MAX_ATTEMPTS} attempts failed. Last error: ${lastError}`);
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
@@ -207,31 +314,32 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
           "Sorry, I wasn't able to generate valid geometry for that description. Try rephrasing your request or simplifying the shape.",
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      /* Persist failure to maintain alternation */
       conversationRef.current.push({
         role: "assistant",
         content: "I was unable to generate valid code for that request.",
       });
     } catch {
+      setStreamingCode(null);
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
         role: "assistant",
         content: "Error: Failed to reach the server. Is the dev server running?",
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      /* Persist failure to maintain alternation */
       conversationRef.current.push({
         role: "assistant",
         content: "I was unable to generate valid code for that request.",
       });
     } finally {
+      setStreamingCode(null);
       setIsGenerating(false);
       onGeneratingChange?.(false);
       sendingRef.current = false;
     }
-  };
+  }, [currentCode, onCodeGenerated, onGeneratingChange, onPromptSent]);
 
   const hasMessages = messages.length > 0;
+  const showSnippet = isGenerating && streamingCode !== null;
 
   return (
     <div className="flex h-full flex-col">
@@ -257,7 +365,7 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
 
       {/* ---- Scrollable message area ---- */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4">
-        {!hasMessages ? (
+        {!hasMessages && !showSnippet ? (
           /* ---- Empty/welcome state ---- */
           <div className="flex h-full flex-col items-center justify-center gap-6 px-6">
             {/* Welcome icon */}
@@ -301,8 +409,14 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
                 content={msg.content}
               />
             ))}
-            {/* Show typing indicator while generating */}
-            {isGenerating && <TypingIndicator />}
+            {/* Show streaming code snippet while generating */}
+            {showSnippet && (
+              <CodeStreamSnippet
+                code={streamingCode}
+                status={streamStatus}
+                attempt={streamAttempt}
+              />
+            )}
           </div>
         )}
       </div>

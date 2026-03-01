@@ -1,8 +1,9 @@
-import threemfSerializer from "@jscad/3mf-serializer";
 import { booleans } from "@jscad/modeling";
 import type { Geom3 } from "@jscad/modeling/src/geometries/types";
 
-export function export3MF(geometry: Geom3 | Geom3[], filename = "model.3mf") {
+export async function export3MF(geometry: Geom3 | Geom3[], filename = "model.3mf") {
+  const threemfSerializer = (await import("@jscad/3mf-serializer")).default;
+
   const merged = Array.isArray(geometry)
     ? booleans.union(...geometry)
     : geometry;
