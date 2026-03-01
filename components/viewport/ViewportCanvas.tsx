@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ViewportCanvas -- The core 3D scene for the CAD Cursor application.
+ * ViewportCanvas -- The core 3D scene for the CadOnCrack application.
  *
  * Theme: Light -- #eeeef2 canvas background, black grid lines.
  *

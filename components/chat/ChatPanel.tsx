@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ChatPanel -- Right-side floating chat interface for the CAD Cursor application.
+ * ChatPanel -- Right-side floating chat interface for the CadOnCrack application.
  *
  * Layout (flex column, full height of the floating island):
  *   1. Header bar with app name and violet logo mark
@@ -403,20 +403,14 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
     <div className="flex h-full flex-col">
       {/* ---- Header bar ---- */}
       <header className="flex shrink-0 items-center gap-3 border-b border-gray-200/60 px-5 py-4">
-        {/* Logo mark: stylized cube icon on violet background */}
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="h-4.5 w-4.5 text-white"
-          >
-            <path d="M10 1l8 4.5v9L10 19l-8-4.5v-9L10 1zm0 1.528L3.5 6.5v7l6.5 3.972L16.5 13.5v-7L10 2.528z" />
-            <path d="M10 6.5L3.5 10 10 13.5 16.5 10 10 6.5z" opacity="0.4" />
-          </svg>
-        </div>
+        {/* Logo mark: favicon icon (no text, since title is beside it) */}
+        <img
+          src="/logo/logofavicon/cadoncrackfavicon.png"
+          alt="CadOnCrack logo"
+          className="h-10 w-10 object-cover scale-[1.8]"
+        />
         <div>
-          <h1 className="text-sm font-semibold text-gray-800">CAD Cursor</h1>
+          <h1 className="text-sm font-semibold text-gray-800">CadOnCrack</h1>
           <p className="text-xs text-gray-400">Prompt to 3D print</p>
         </div>
       </header>

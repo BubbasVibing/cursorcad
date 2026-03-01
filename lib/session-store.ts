@@ -1,6 +1,6 @@
 import type { DesignSession } from "@/lib/types";
 
-const STORAGE_KEY = "cad-cursor-sessions";
+const STORAGE_KEY = "cadoncrack-sessions";
 const MAX_SESSIONS = 50;
 
 export function generateSessionId(): string {

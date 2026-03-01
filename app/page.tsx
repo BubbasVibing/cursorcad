@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Home page -- Root entry point for the CAD Cursor application.
+ * Home page -- Root entry point for the CadOnCrack application.
  *
  * Layout architecture (futuristic white/violet theme):
  *   - Viewport fills the entire screen as a background layer (fixed, inset-0)
