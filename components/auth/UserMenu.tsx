@@ -18,7 +18,7 @@ export default function UserMenu() {
     return (
       <div className="px-4 py-3 border-t border-gray-200/60">
         <button
-          onClick={() => signIn("google")}
+          onClick={() => signIn()}
           className="
             flex w-full items-center justify-center gap-1.5
             bg-violet-500 text-white rounded-lg h-8

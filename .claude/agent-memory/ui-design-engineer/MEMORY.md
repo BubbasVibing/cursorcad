@@ -45,10 +45,17 @@
 
 ## Files Reference
 - Page: `app/page.tsx` (floating island layout, toggle, resize)
+- Landing: `app/landing/page.tsx` (marketing page -- hero, founders, footer; statically prerendered)
+- Auth: `app/auth/signin/page.tsx`
 - Chat: `components/chat/{ChatPanel,InputBar,MessageBubble,TypingIndicator,QuickPromptChips}.tsx`
 - Viewport: `components/viewport/{Viewport,ViewportCanvas,ViewportHUD,LoadingOverlay,GeometryMesh}.tsx`
 - Layout: `components/layout/SplitPane.tsx` (DEPRECATED, unused)
 - Backend: `lib/{jscad-runner,jscad-to-three,stl-export}.ts`, `app/api/generate/route.ts`
+
+## Static Assets
+- Logo: `/public/logo/platformlogo/cadoncracklogo-cropped.png` (navbar/footer logo)
+- Favicon: `/public/logo/logofavicon/cadoncrackfavicon.png`
+- Product screenshot: `/public/softwareimage/softwareimage.png` (hero section)
 
 ## Gotchas
 - Tailwind CSS 4 uses `@import "tailwindcss"` (not v3 `@tailwind` directives)

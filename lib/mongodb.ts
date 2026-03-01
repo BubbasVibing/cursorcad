@@ -49,15 +49,8 @@ declare global {
 
 export function getClientPromise(): Promise<MongoClient> {
   const uri = getMongoUri();
-
-  if (process.env.NODE_ENV === "development") {
-    if (!global._mongoClientPromise) {
-      const client = new MongoClient(uri);
-      global._mongoClientPromise = client.connect();
-    }
-    return global._mongoClientPromise;
+  if (!global._mongoClientPromise) {
+    global._mongoClientPromise = new MongoClient(uri).connect();
   }
-
-  const client = new MongoClient(uri);
-  return client.connect();
+  return global._mongoClientPromise;
 }

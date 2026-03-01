@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CadOnCrack",
-  description: "Natural language to 3D print file",
+  title: "CadOnCrack — Powered by CadBot",
+  description: "CadOnCrack: Natural language to 3D print file, powered by the CadBot engine",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },

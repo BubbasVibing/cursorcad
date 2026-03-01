@@ -3,13 +3,16 @@
 /**
  * GeometryMesh -- Renders one or more 3D parts from the JSCAD pipeline.
  *
- * Supports solid + structural-edge wireframe rendering (EdgesGeometry).
+ * Wireframe mode shows two edge layers for engineering accuracy:
+ *   1. WireframeGeometry — all mesh edges (lighter, shows full tessellation)
+ *   2. EdgesGeometry — feature/hard edges only (darker, highlights structure)
+ *
  * Supports part selection highlighting (dims unselected parts).
  * Each part gets its own color from the part data or a default palette.
  */
 
 import { memo, useMemo } from "react";
-import { EdgesGeometry } from "three";
+import { EdgesGeometry, WireframeGeometry } from "three";
 import type { ThreePart } from "@/lib/types";
 
 const DEFAULT_PALETTE = [
@@ -37,7 +40,13 @@ export default memo(function GeometryMesh({ parts, wireframe = false, selectedPa
 
   const hasSelection = selectedPart !== null;
 
-  // Pre-compute EdgesGeometry for each part (only structural edges, not triangulation)
+  // All mesh edges — shows full tessellation structure (triangles on curved surfaces)
+  const wireGeometries = useMemo(
+    () => parts.map((part) => new WireframeGeometry(part.geometry)),
+    [parts],
+  );
+
+  // Feature/hard edges only — highlights structural boundaries (sharp corners, holes, etc.)
   const edgeGeometries = useMemo(
     () => parts.map((part) => new EdgesGeometry(part.geometry, EDGE_THRESHOLD_ANGLE)),
     [parts],
@@ -59,15 +68,26 @@ export default memo(function GeometryMesh({ parts, wireframe = false, selectedPa
                 roughness={0.5}
                 metalness={0.1}
                 transparent={wireframe || isDimmed}
-                opacity={wireframe ? (isDimmed ? 0.08 : 0.25) : opacity}
+                opacity={wireframe ? (isDimmed ? 0.05 : 0.12) : opacity}
               />
             </mesh>
 
-            {/* Structural edge lines — only in wireframe mode */}
+            {/* All mesh edges — light lines showing tessellation */}
+            {wireframe && (
+              <lineSegments geometry={wireGeometries[i]}>
+                <lineBasicMaterial
+                  color={isDimmed ? "#d1d5db" : "#94a3b8"}
+                  transparent
+                  opacity={isDimmed ? 0.1 : 0.45}
+                />
+              </lineSegments>
+            )}
+
+            {/* Feature edges — bold lines on hard edges for structural clarity */}
             {wireframe && (
               <lineSegments geometry={edgeGeometries[i]}>
                 <lineBasicMaterial
-                  color={isDimmed ? "#9ca3af" : "#1e1e1e"}
+                  color={isDimmed ? "#9ca3af" : "#1e293b"}
                   transparent={isDimmed}
                   opacity={isDimmed ? 0.15 : 1}
                 />

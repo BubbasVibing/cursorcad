@@ -1,17 +1,68 @@
 "use client";
 
+import { useState } from "react";
 import { signIn } from "next-auth/react";
 
 export default function SignInPage() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (mode === "signup") {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim(), email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "Registration failed");
+          setLoading(false);
+          return;
+        }
+      }
+
+      const result = await signIn("credentials", {
+        redirect: false,
+        email,
+        password,
+      });
+
+      if (result?.error) {
+        setError(
+          mode === "signin"
+            ? "Invalid email or password"
+            : "Account created but sign-in failed. Try signing in.",
+        );
+        if (mode === "signup") setMode("signin");
+      } else {
+        window.location.href = "/";
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f7f7fb]">
-      {/* Subtle background pattern */}
+      {/* Subtle violet radial gradient */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(139,92,246,0.08),transparent_60%)]" />
 
       <div className="relative w-full max-w-sm mx-auto px-4">
         <div className="bg-white/70 backdrop-blur-xl border border-white/50 rounded-2xl p-8 shadow-2xl">
-          {/* Logo / Header */}
-          <div className="text-center mb-8">
+          {/* Logo + Header */}
+          <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-violet-50 mb-4 overflow-hidden">
               <img
                 src="/logo/logofavicon/cadoncrackfavicon.png"
@@ -21,19 +72,161 @@ export default function SignInPage() {
             </div>
             <h1 className="text-xl font-semibold text-gray-800">CadOnCrack</h1>
             <p className="text-sm text-gray-400 mt-1">
-              Sign in to save your designs
+              {mode === "signin"
+                ? "Sign in to save your designs"
+                : "Create an account to get started"}
             </p>
           </div>
 
-          {/* Google Sign In Button */}
+          {/* Tab toggle */}
+          <div className="mb-5">
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() => { setMode("signin"); setError(""); }}
+                className={`
+                  flex-1 py-2 text-xs font-medium rounded-md
+                  transition-all duration-150
+                  ${mode === "signin"
+                    ? "bg-white text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                  }
+                `}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode("signup"); setError(""); }}
+                className={`
+                  flex-1 py-2 text-xs font-medium rounded-md
+                  transition-all duration-150
+                  ${mode === "signup"
+                    ? "bg-white text-gray-800 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                  }
+                `}
+              >
+                Sign Up
+              </button>
+            </div>
+          </div>
+
+          {/* Email/password form */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Name field — only in signup mode */}
+            {mode === "signup" && (
+              <div>
+                <label htmlFor="name" className="block text-xs font-medium text-gray-500 mb-1">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  className="
+                    w-full h-10 px-3 rounded-xl
+                    border border-gray-200 bg-white/80
+                    text-sm text-gray-800 placeholder:text-gray-400
+                    focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20
+                    transition-all duration-150
+                  "
+                />
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="email" className="block text-xs font-medium text-gray-500 mb-1">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="
+                  w-full h-10 px-3 rounded-xl
+                  border border-gray-200 bg-white/80
+                  text-sm text-gray-800 placeholder:text-gray-400
+                  focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20
+                  transition-all duration-150
+                "
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-xs font-medium text-gray-500 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+                className="
+                  w-full h-10 px-3 rounded-xl
+                  border border-gray-200 bg-white/80
+                  text-sm text-gray-800 placeholder:text-gray-400
+                  focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20
+                  transition-all duration-150
+                "
+              />
+            </div>
+
+            {/* Error message */}
+            {error && (
+              <p className="text-sm text-red-500 text-center py-1">{error}</p>
+            )}
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="
+                flex w-full items-center justify-center
+                bg-violet-500 text-white rounded-xl h-11
+                text-sm font-medium
+                hover:bg-violet-600 active:scale-[0.98]
+                disabled:opacity-50 disabled:pointer-events-none
+                transition-all duration-150
+                cursor-pointer
+              "
+            >
+              {loading ? (
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : mode === "signin" ? (
+                "Sign In"
+              ) : (
+                "Create Account"
+              )}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {/* Google sign-in button */}
           <button
             onClick={() => signIn("google", { callbackUrl: "/" })}
             className="
               flex w-full items-center justify-center gap-3
               bg-white text-gray-700 rounded-xl h-11
               text-sm font-medium
-              border border-gray-200
-              shadow-sm
+              border border-gray-200 shadow-sm
               hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98]
               transition-all duration-150
               cursor-pointer
