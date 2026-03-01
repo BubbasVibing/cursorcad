@@ -16,14 +16,14 @@
  *   disabled   -- disables the input and send button
  */
 
-import { useRef, useState, useCallback, type KeyboardEvent } from "react";
+import { useRef, useState, useCallback, memo, type KeyboardEvent } from "react";
 
 interface InputBarProps {
   onSend?: (message: string) => void;
   disabled?: boolean;
 }
 
-export default function InputBar({ onSend, disabled = false }: InputBarProps) {
+export default memo(function InputBar({ onSend, disabled = false }: InputBarProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -126,4 +126,4 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
       </div>
     </div>
   );
-}
+});

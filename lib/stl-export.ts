@@ -1,8 +1,9 @@
-import stlSerializer from "@jscad/stl-serializer";
 import { booleans } from "@jscad/modeling";
 import type { Geom3 } from "@jscad/modeling/src/geometries/types";
 
-export function exportSTL(geometry: Geom3 | Geom3[], filename = "model.stl") {
+export async function exportSTL(geometry: Geom3 | Geom3[], filename = "model.stl") {
+  const stlSerializer = (await import("@jscad/stl-serializer")).default;
+
   const merged = Array.isArray(geometry)
     ? booleans.union(...geometry)
     : geometry;

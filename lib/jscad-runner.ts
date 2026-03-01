@@ -23,7 +23,12 @@ export type JscadResult =
   | { ok: true; parts: JscadPart[] }
   | { ok: false; error: string };
 
+const MAX_CACHE_SIZE = 20;
+const compilationCache = new Map<string, JscadResult>();
+
 export function runJscad(code: string): JscadResult {
+  const cached = compilationCache.get(code);
+  if (cached) return cached;
   try {
     const wrappedCode = `"use strict"; return (function() { ${code} })();`;
     const fn = new Function(...PRIMITIVE_NAMES, wrappedCode);
@@ -31,7 +36,9 @@ export function runJscad(code: string): JscadResult {
 
     // Single geom3 → wrap as one-part array
     if (geometries.geom3.isA(result)) {
-      return { ok: true, parts: [{ geometry: result as Geom3 }] };
+      const okResult: JscadResult = { ok: true, parts: [{ geometry: result as Geom3 }] };
+      cacheResult(code, okResult);
+      return okResult;
     }
 
     // Array of parts → validate each element
@@ -53,18 +60,32 @@ export function runJscad(code: string): JscadResult {
           name: typeof item?.name === "string" ? item.name : undefined,
         });
       }
-      return { ok: true, parts };
+      const partsResult: JscadResult = { ok: true, parts };
+      cacheResult(code, partsResult);
+      return partsResult;
     }
 
-    return {
+    const failResult: JscadResult = {
       ok: false,
       error:
         "Code must return a geom3 object or an array of { geometry, color?, name? } parts.",
     };
+    cacheResult(code, failResult);
+    return failResult;
   } catch (err) {
-    return {
+    const errResult: JscadResult = {
       ok: false,
       error: err instanceof Error ? err.message : String(err),
     };
+    cacheResult(code, errResult);
+    return errResult;
   }
+}
+
+function cacheResult(code: string, result: JscadResult) {
+  if (compilationCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = compilationCache.keys().next().value;
+    if (firstKey !== undefined) compilationCache.delete(firstKey);
+  }
+  compilationCache.set(code, result);
 }
