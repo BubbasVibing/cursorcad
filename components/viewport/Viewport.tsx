@@ -11,6 +11,7 @@
  */
 
 import dynamic from "next/dynamic";
+import type { CadSettings } from "@/lib/types";
 
 /* Dynamic import with SSR disabled for the R3F scene */
 const ViewportCanvas = dynamic(
@@ -33,12 +34,30 @@ const ViewportCanvas = dynamic(
 interface ViewportProps {
   jscadCode?: string | null;
   modelDescription?: string | null;
+  settings?: CadSettings;
+  leftSidebarOpen?: boolean;
+  chatOpen?: boolean;
+  panelWidth?: number;
 }
 
-export default function Viewport({ jscadCode, modelDescription }: ViewportProps) {
+export default function Viewport({
+  jscadCode,
+  modelDescription,
+  settings,
+  leftSidebarOpen,
+  chatOpen,
+  panelWidth,
+}: ViewportProps) {
   return (
     <div className="h-full w-full">
-      <ViewportCanvas jscadCode={jscadCode} modelDescription={modelDescription} />
+      <ViewportCanvas
+        jscadCode={jscadCode}
+        modelDescription={modelDescription}
+        settings={settings}
+        leftSidebarOpen={leftSidebarOpen}
+        chatOpen={chatOpen}
+        panelWidth={panelWidth}
+      />
     </div>
   );
 }

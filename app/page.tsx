@@ -5,9 +5,10 @@
  *
  * Layout architecture (futuristic white/violet theme):
  *   - Viewport fills the entire screen as a background layer (fixed, inset-0)
+ *   - LeftSidebar floats on the LEFT as a glass-morphism island (280px wide)
  *   - ChatPanel floats on the RIGHT as a glass-morphism island (~400px wide)
- *   - Toggle button reveals/hides the chat island with smooth slide animation
- *   - Drag-to-resize handle on the left edge of the island
+ *   - Toggle buttons reveal/hide each sidebar with smooth slide animation
+ *   - Drag-to-resize handle on the left edge of the chat island
  *
  * Owns the shared `jscadCode` state that connects the chat panel
  * (which fetches code from the API) to the viewport (which renders it).
@@ -16,6 +17,10 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import ChatPanel from "@/components/chat/ChatPanel";
 import Viewport from "@/components/viewport/Viewport";
+import LeftSidebar from "@/components/sidebar/LeftSidebar";
+import type { DesignSession, CadSettings, ConversationMessage } from "@/lib/types";
+import { loadSessions, saveSession, deleteSession as deleteSessionFromStore, generateSessionId } from "@/lib/session-store";
+import { loadSettings, saveSettings, DEFAULT_SETTINGS } from "@/lib/settings-store";
 
 /* ---- Constants ---- */
 const MIN_PANEL_WIDTH = 320;
@@ -63,13 +68,115 @@ export default function Home() {
   const [chatOpen, setChatOpen] = useState(true);
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
 
-  /* Hover zone: show toggle button when mouse is near right edge */
+  /* Hover zones: show toggle buttons when mouse is near edges */
   const [showToggle, setShowToggle] = useState(false);
+  const [showLeftToggle, setShowLeftToggle] = useState(false);
+
+  /* Left sidebar state */
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
+
+  /* Session management */
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<DesignSession[]>(() => {
+    if (typeof window === "undefined") return [];
+    return loadSessions();
+  });
+
+  /* Settings */
+  const [settings, setSettings] = useState<CadSettings>(() => {
+    if (typeof window === "undefined") return DEFAULT_SETTINGS;
+    return loadSettings();
+  });
+
+  /* Chat messages ref for session save/restore */
+  const [chatMessages, setChatMessages] = useState<ConversationMessage[]>([]);
+
+  /* Key to force ChatPanel remount when loading a session */
+  const [chatKey, setChatKey] = useState(0);
 
   /* Resize drag state */
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(DEFAULT_PANEL_WIDTH);
+
+  /* ---- Auto-save current session (debounced) ---- */
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    // Only auto-save if there's something to save
+    if (!jscadCode && chatMessages.length === 0) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const sessionId = activeSessionId || generateSessionId();
+      if (!activeSessionId) setActiveSessionId(sessionId);
+
+      const title = lastPrompt
+        ? lastPrompt.slice(0, 60)
+        : "Untitled Design";
+
+      const session: DesignSession = {
+        id: sessionId,
+        title,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: chatMessages,
+        jscadCode,
+        lastPrompt,
+      };
+
+      // Preserve createdAt from existing session
+      const existing = sessions.find((s) => s.id === sessionId);
+      if (existing) session.createdAt = existing.createdAt;
+
+      saveSession(session);
+      setSessions(loadSessions());
+    }, 1000);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [jscadCode, chatMessages, lastPrompt, activeSessionId, sessions]);
+
+  /* ---- Settings change handler ---- */
+  const handleSettingsChange = useCallback((newSettings: CadSettings) => {
+    setSettings(newSettings);
+    saveSettings(newSettings);
+  }, []);
+
+  /* ---- New Design ---- */
+  const handleNewDesign = useCallback(() => {
+    setJscadCode(null);
+    setLastPrompt(null);
+    setChatMessages([]);
+    setActiveSessionId(null);
+    setChatKey((k) => k + 1);
+  }, []);
+
+  /* ---- Load Session ---- */
+  const handleLoadSession = useCallback((id: string) => {
+    const session = sessions.find((s) => s.id === id);
+    if (!session) return;
+
+    setActiveSessionId(session.id);
+    setJscadCode(session.jscadCode);
+    setLastPrompt(session.lastPrompt);
+    setChatMessages(session.messages);
+    setChatKey((k) => k + 1);
+  }, [sessions]);
+
+  /* ---- Delete Session ---- */
+  const handleDeleteSession = useCallback((id: string) => {
+    deleteSessionFromStore(id);
+    setSessions(loadSessions());
+    if (activeSessionId === id) {
+      setActiveSessionId(null);
+    }
+  }, [activeSessionId]);
+
+  /* ---- Chat messages change callback ---- */
+  const handleMessagesChange = useCallback((messages: ConversationMessage[]) => {
+    setChatMessages(messages);
+  }, []);
 
   /* ---- Resize handlers ---- */
   const onResizeStart = useCallback(
@@ -84,13 +191,25 @@ export default function Home() {
     [panelWidth]
   );
 
-  /* ---- God mode shortcut: Cmd+Shift+G (Mac) / Ctrl+Shift+G (Win) ---- */
+  /* ---- God mode shortcut + sidebar toggles ---- */
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "g") {
         e.preventDefault();
         setJscadCode(GOD_MODE_CODE);
         setLastPrompt("Mechanical bearing housing");
+        return;
+      }
+
+      if (e.key === "[") {
+        e.preventDefault();
+        setLeftSidebarOpen((prev) => !prev);
+      } else if (e.key === "]") {
+        e.preventDefault();
+        setChatOpen((prev) => !prev);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -126,13 +245,32 @@ export default function Home() {
   }, []);
 
   const viewportEl = useMemo(
-    () => <Viewport jscadCode={jscadCode} modelDescription={lastPrompt} />,
-    [jscadCode, lastPrompt],
+    () => (
+      <Viewport
+        jscadCode={jscadCode}
+        modelDescription={lastPrompt}
+        settings={settings}
+        leftSidebarOpen={leftSidebarOpen}
+        chatOpen={chatOpen}
+        panelWidth={panelWidth}
+      />
+    ),
+    [jscadCode, lastPrompt, settings, leftSidebarOpen, chatOpen, panelWidth],
   );
 
   const chatPanelEl = useMemo(
-    () => <ChatPanel onCodeGenerated={setJscadCode} onGeneratingChange={setIsGenerating} currentCode={jscadCode} onPromptSent={setLastPrompt} />,
-    [jscadCode],
+    () => (
+      <ChatPanel
+        key={chatKey}
+        onCodeGenerated={setJscadCode}
+        onGeneratingChange={setIsGenerating}
+        currentCode={jscadCode}
+        onPromptSent={setLastPrompt}
+        onMessagesChange={handleMessagesChange}
+        initialMessages={chatMessages}
+      />
+    ),
+    [jscadCode, chatKey, chatMessages, handleMessagesChange],
   );
 
   return (
@@ -145,6 +283,75 @@ export default function Home() {
       </div>
 
       {/* ======================================
+          Left Sidebar -- History & Settings
+          ====================================== */}
+      <LeftSidebar
+        open={leftSidebarOpen}
+        onToggle={() => setLeftSidebarOpen((prev) => !prev)}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        settings={settings}
+        onLoadSession={handleLoadSession}
+        onDeleteSession={handleDeleteSession}
+        onNewDesign={handleNewDesign}
+        onSettingsChange={handleSettingsChange}
+      />
+
+      {/* ======================================
+          Left-edge hover zone -- reveals toggle
+          ====================================== */}
+      <div
+        className="absolute left-0 top-0 z-30 h-full w-16"
+        onMouseEnter={() => setShowLeftToggle(true)}
+        onMouseLeave={() => setShowLeftToggle(false)}
+      />
+
+      {/* ======================================
+          Left toggle button
+          ====================================== */}
+      <button
+        onClick={() => setLeftSidebarOpen((prev) => !prev)}
+        onMouseEnter={() => setShowLeftToggle(true)}
+        onMouseLeave={() => setShowLeftToggle(false)}
+        aria-label={leftSidebarOpen ? "Close sidebar" : "Open sidebar"}
+        className={`
+          absolute z-40 top-1/2 -translate-y-1/2
+          flex h-10 w-6 items-center justify-center
+          rounded-r-lg bg-white/80 backdrop-blur-md
+          border border-l-0 border-gray-200 shadow-lg
+          text-gray-500 hover:text-violet-500
+          transition-all duration-300 ease-in-out
+          ${
+            leftSidebarOpen
+              ? ""
+              : showLeftToggle
+                ? "opacity-100"
+                : "opacity-0 pointer-events-none"
+          }
+        `}
+        style={{
+          left: leftSidebarOpen
+            ? `${280 + EDGE_MARGIN}px`
+            : "0px",
+        }}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className={`h-4 w-4 transition-transform duration-300 ${
+            leftSidebarOpen ? "rotate-180" : "rotate-0"
+          }`}
+        >
+          <path
+            fillRule="evenodd"
+            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </button>
+
+      {/* ======================================
           Right-edge hover zone -- reveals toggle
           ====================================== */}
       <div
@@ -154,7 +361,7 @@ export default function Home() {
       />
 
       {/* ======================================
-          Toggle button -- small pill that slides
+          Right toggle button -- small pill that slides
           with the panel open/close state
           ====================================== */}
       <button

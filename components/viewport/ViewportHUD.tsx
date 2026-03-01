@@ -22,6 +22,7 @@ interface ViewportHUDProps {
   partCount?: number | null;
   isWatertight?: boolean | null;
   dimensions?: { width: number; height: number; depth: number } | null;
+  unitSystem?: "mm" | "cm" | "in";
   onExport?: () => void;
   exportFormat?: ExportFormat;
   onExportFormatChange?: (format: ExportFormat) => void;
@@ -37,6 +38,7 @@ export default function ViewportHUD({
   partCount = null,
   isWatertight = null,
   dimensions = null,
+  unitSystem = "mm",
   onExport,
   exportFormat = "stl",
   onExportFormatChange,
@@ -47,11 +49,21 @@ export default function ViewportHUD({
 }: ViewportHUDProps) {
   const hasModel = !!modelName;
 
+  /** Convert mm value to current unit system. */
+  function convert(v: number): number {
+    if (unitSystem === "cm") return v / 10;
+    if (unitSystem === "in") return v / 25.4;
+    return v;
+  }
+
   /** Format a dimension value to appropriate precision. */
   function fmt(v: number): string {
-    if (v < 0.1) return v.toFixed(2);
-    return v.toFixed(1);
+    const converted = convert(v);
+    if (converted < 0.1) return converted.toFixed(2);
+    return converted.toFixed(1);
   }
+
+  const unitLabel = unitSystem;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 p-4 font-mono text-xs">
@@ -93,7 +105,7 @@ export default function ViewportHUD({
           {/* Dimensions row */}
           {dimensions && (
             <span className="text-gray-400">
-              {fmt(dimensions.width)} &times; {fmt(dimensions.height)} &times; {fmt(dimensions.depth)} mm
+              {fmt(dimensions.width)} &times; {fmt(dimensions.height)} &times; {fmt(dimensions.depth)} {unitLabel}
             </span>
           )}
         </div>
