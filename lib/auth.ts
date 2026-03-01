@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import GitHub from "next-auth/providers/github";
 import type { NextAuthConfig } from "next-auth";
 
 const hasMongoDb = !!process.env.MONGODB_URI;
@@ -28,7 +27,7 @@ async function getAdapter() {
 }
 
 const config: NextAuthConfig = {
-  providers: [Google, GitHub],
+  providers: [Google],
   session: { strategy: "jwt" },
   callbacks: {
     jwt({ token, user }) {
