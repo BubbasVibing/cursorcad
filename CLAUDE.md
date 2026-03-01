@@ -32,7 +32,7 @@ No test runner is configured yet.
 
 ## JSCAD Allowed Primitives
 
-cuboid, sphere, cylinder, torus, union, subtract, intersect, translate, rotate, scale, mirror — nothing else.
+cuboid, sphere, cylinder, torus, polygon, union, subtract, intersect, translate, rotate, scale, mirror, extrudeRotate — nothing else.
 
 ## Architecture
 
