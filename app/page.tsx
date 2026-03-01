@@ -149,6 +149,8 @@ export default function Home() {
           ====================================== */}
       <button
         onClick={() => setChatOpen((prev) => !prev)}
+        onMouseEnter={() => setShowToggle(true)}
+        onMouseLeave={() => setShowToggle(false)}
         aria-label={chatOpen ? "Close chat" : "Open chat"}
         className={`
           absolute z-40 top-1/2 -translate-y-1/2
@@ -159,18 +161,16 @@ export default function Home() {
           transition-all duration-300 ease-in-out
           ${
             chatOpen
-              ? `right-[${panelWidth + EDGE_MARGIN}px]`
+              ? ""
               : showToggle
-                ? "right-0 opacity-100"
-                : "right-0 opacity-0 pointer-events-none"
+                ? "opacity-100"
+                : "opacity-0 pointer-events-none"
           }
         `}
         style={{
           right: chatOpen
             ? `${panelWidth + EDGE_MARGIN}px`
-            : showToggle
-              ? "0px"
-              : "0px",
+            : "0px",
         }}
       >
         {/* Chevron icon -- flips based on state */}
