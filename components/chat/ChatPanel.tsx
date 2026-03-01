@@ -18,6 +18,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import InputBar from "@/components/chat/InputBar";
+import type { ImageData } from "@/components/chat/InputBar";
 import MessageBubble from "@/components/chat/MessageBubble";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import QuickPromptChips from "@/components/chat/QuickPromptChips";
@@ -52,6 +53,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  imageDataUrl?: string;
 }
 
 interface ChatPanelProps {
@@ -79,16 +81,19 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
   }, [messages, isGenerating]);
 
   /* ---- Handle sending a message (with retry loop) ---- */
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, image?: ImageData) => {
     /* Prevent rapid double-sends */
     if (sendingRef.current) return;
     sendingRef.current = true;
+
+    const hasImage = !!image;
 
     /* Add user message to UI */
     const userMsg: Message = {
       id: `msg-${Date.now()}`,
       role: "user",
       content,
+      imageDataUrl: image?.dataUrl,
     };
     setMessages((prev) => [...prev, userMsg]);
     setIsGenerating(true);
@@ -123,11 +128,20 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
           ];
         }
 
-        /* 1. Call /api/generate */
+        /* 1. Call /api/generate — include image only on first attempt */
+        const fetchBody: Record<string, unknown> = {
+          messages: attemptMessages,
+          currentCode,
+        };
+        if (hasImage && attempt === 1) {
+          fetchBody.imageBase64 = image.base64;
+          fetchBody.imageMediaType = image.mediaType;
+        }
+
         const res = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: attemptMessages, currentCode }),
+          body: JSON.stringify(fetchBody),
         });
 
         let data;
@@ -164,6 +178,21 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
           return;
         }
 
+        /* Check for vision "Unable to identify" response */
+        if (hasImage && data.code && data.code.includes("Unable to identify")) {
+          const assistantMsg: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: "I couldn't identify the object in that photo. Try a clearer image or describe the shape in words instead.",
+          };
+          setMessages((prev) => [...prev, assistantMsg]);
+          conversationRef.current.push({
+            role: "assistant",
+            content: "I was unable to identify the object in the photo.",
+          });
+          return;
+        }
+
         /* 3. Validate code in sandbox */
         const result = runJscad(data.code);
 
@@ -175,7 +204,12 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
             console.log(`[ChatPanel] Attempt ${attempt}/${MAX_ATTEMPTS} succeeded after retry`);
           }
 
-          const label = isEdit ? "Model updated" : "Model generated";
+          const label = hasImage
+            ? "Model generated from your photo"
+            : isEdit
+              ? "Model updated"
+              : "Model generated";
+
           const assistantMsg: Message = {
             id: `msg-${Date.now()}`,
             role: "assistant",
@@ -200,11 +234,13 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
 
       /* All attempts exhausted */
       console.error(`[ChatPanel] All ${MAX_ATTEMPTS} attempts failed. Last error: ${lastError}`);
+      const exhaustedMessage = hasImage
+        ? "The object might be too complex for the available primitives. Try describing the shape in words instead."
+        : "Sorry, I wasn't able to generate valid geometry for that description. Try rephrasing your request or simplifying the shape.";
       const assistantMsg: Message = {
         id: `msg-${Date.now()}`,
         role: "assistant",
-        content:
-          "Sorry, I wasn't able to generate valid geometry for that description. Try rephrasing your request or simplifying the shape.",
+        content: exhaustedMessage,
       };
       setMessages((prev) => [...prev, assistantMsg]);
       /* Persist failure to maintain alternation */
@@ -299,6 +335,7 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
                 key={msg.id}
                 role={msg.role}
                 content={msg.content}
+                imageDataUrl={msg.imageDataUrl}
               />
             ))}
             {/* Show typing indicator while generating */}

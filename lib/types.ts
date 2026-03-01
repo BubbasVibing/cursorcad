@@ -5,6 +5,12 @@ export interface ConversationMessage {
   content: string;
 }
 
+/** Image attachment for vision requests. */
+export interface ImageAttachment {
+  base64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp";
+}
+
 /** A single named/colored part returned by JSCAD code. */
 export interface JscadPart {
   geometry: import("@jscad/modeling/src/geometries/types").Geom3;

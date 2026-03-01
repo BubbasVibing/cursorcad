@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateCode } from "@/lib/claude";
-import type { ConversationMessage } from "@/lib/types";
+import type { ConversationMessage, ImageAttachment } from "@/lib/types";
+
+const ALLOWED_MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_BASE64_LENGTH = 20 * 1024 * 1024; // ~20MB string length
 
 export async function POST(req: NextRequest) {
   let body;
@@ -13,9 +16,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages, currentCode } = body as {
+  const { messages, currentCode, imageBase64, imageMediaType } = body as {
     messages: ConversationMessage[];
     currentCode?: string | null;
+    imageBase64?: string;
+    imageMediaType?: string;
   };
 
   if (
@@ -29,8 +34,29 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  /* Build image attachment if provided */
+  let image: ImageAttachment | null = null;
+  if (imageBase64) {
+    if (!imageMediaType || !ALLOWED_MEDIA_TYPES.includes(imageMediaType)) {
+      return NextResponse.json(
+        { error: "Invalid image type. Supported: JPEG, PNG, WebP." },
+        { status: 400 },
+      );
+    }
+    if (imageBase64.length > MAX_BASE64_LENGTH) {
+      return NextResponse.json(
+        { error: "Image is too large. Please use a smaller image." },
+        { status: 400 },
+      );
+    }
+    image = {
+      base64: imageBase64,
+      mediaType: imageMediaType as ImageAttachment["mediaType"],
+    };
+  }
+
   try {
-    const code = await generateCode(messages, currentCode);
+    const code = await generateCode(messages, currentCode, image);
     return NextResponse.json({ code });
   } catch (err) {
     console.error("[generate] error:", err);
@@ -39,6 +65,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Server is not configured — missing API key" },
         { status: 500 },
+      );
+    }
+
+    /* Handle Anthropic image-related errors */
+    if (err instanceof Error && err.message.includes("image")) {
+      return NextResponse.json(
+        { error: "Could not process the image. Try a different photo." },
+        { status: 400 },
       );
     }
 

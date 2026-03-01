@@ -1,21 +1,23 @@
 /**
- * MessageBubble -- Renders a single chat message.
+ * MessageBubble -- Renders a single chat message with optional image thumbnail.
  *
  * Two visual variants controlled by `role`:
  *   - "user"      : right-aligned, violet-500 background, white text
  *   - "assistant" : left-aligned, gray-100 background, gray-800 text
  *
  * Props:
- *   role    -- who sent the message
- *   content -- the plain-text message body
+ *   role         -- who sent the message
+ *   content      -- the plain-text message body
+ *   imageDataUrl -- optional image thumbnail (shown above text in user bubbles)
  */
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
+  imageDataUrl?: string;
 }
 
-export default function MessageBubble({ role, content }: MessageBubbleProps) {
+export default function MessageBubble({ role, content, imageDataUrl }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -34,6 +36,14 @@ export default function MessageBubble({ role, content }: MessageBubbleProps) {
           }
         `}
       >
+        {/* Image thumbnail above text */}
+        {imageDataUrl && isUser && (
+          <img
+            src={imageDataUrl}
+            alt="Attached"
+            className="mb-2 max-w-[200px] max-h-[150px] rounded-lg object-cover"
+          />
+        )}
         {/* Preserve line breaks in messages */}
         <p className="whitespace-pre-wrap">{content}</p>
       </div>

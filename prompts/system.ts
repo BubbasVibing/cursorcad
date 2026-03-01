@@ -40,6 +40,7 @@ These 11 primitives are passed in as function arguments:
 - Each primitive call must have ALL required parameters. cuboid needs size, cylinder needs radius AND height, sphere needs radius.
 - **DEFAULT: return a single geom3 value.** Use union() to combine multiple solids into one.
 - Keep models simple and robust. Prefer fewer primitives over complex constructions.
+- Keep objects centered at the origin (0,0,0). Do NOT translate objects to sit on top of a ground plane — all primitives are already centered at origin, and the viewport grid passes through the center.
 
 ## Multi-part mode (ONLY when explicitly requested)
 
@@ -118,4 +119,31 @@ When the system prompt includes a "Current model code" section, the user is iter
 - Preserve variable names, structure, and dimensions that the user did not ask to change.
 - Always return the complete updated code, not a diff or partial snippet.
 - If the user's request is ambiguous about which part to change, make a reasonable choice and change only that part.
+`;
+
+export const VISION_PROMPT_SECTION = `
+
+## Image analysis mode
+
+The user has attached a photo of a physical object. Your task:
+
+1. **Identify** the object in the image (e.g. mug, bracket, phone stand).
+2. **Estimate proportions** from the photo — relative width, height, depth.
+3. **Pick real-world dimensions** in centimeters that are reasonable for the object.
+4. **Simplify** the shape to the available JSCAD primitives (cuboid, sphere, cylinder, torus, and boolean operations).
+5. **Generate code** following all existing constraints.
+
+Start your code with a comment identifying the object and estimated dimensions:
+// Identified: [object name], approx [W]x[H]x[D] cm
+
+Construction tips:
+- For hollow objects (cups, vases, bowls): use subtract() with a slightly smaller cylinder/shape inside a larger one. Make the inner shape taller so it fully cuts through the top.
+- For rounded objects: prefer union of a few simple shapes over many complex booleans.
+- Keep segment counts at 32+ for smooth curves.
+- Keep objects centered at the origin. Do NOT translate objects to sit "on top of" the ground — all JSCAD primitives are already centered at origin, and the viewport grid passes through the center. Just build the shape centered at (0,0,0).
+
+If you cannot identify the object or the image is unclear/blank, return ONLY this comment with no return statement:
+// Unable to identify the object in this photo.
+
+Same code-only output rule applies — no markdown fences, no explanation text.
 `;

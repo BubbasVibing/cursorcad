@@ -263,7 +263,10 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
         />
 
         {/* ---- Multi-part 3D geometry from JSCAD pipeline ---- */}
-        <GeometryMesh parts={parts} wireframe={wireframe} />
+        {/* Rotate -90° around X to map JSCAD Z-up to Three.js Y-up */}
+        <group rotation={[-Math.PI / 2, 0, 0]}>
+          <GeometryMesh parts={parts} wireframe={wireframe} />
+        </group>
       </Canvas>
     </div>
   );
