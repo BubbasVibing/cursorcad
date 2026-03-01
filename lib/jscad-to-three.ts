@@ -7,7 +7,15 @@ import type { JscadPart, ThreePart } from "@/lib/types";
 export function jscadToThree(geom: Geom3): BufferGeometry {
   const polygons = geometries.geom3.toPolygons(geom);
 
-  const positions: number[] = [];
+  // Pass 1: count total triangles for pre-allocation
+  let triCount = 0;
+  for (const poly of polygons) {
+    triCount += poly.vertices.length - 2;
+  }
+
+  // Pass 2: fill pre-allocated Float32Array with indexed writes
+  const positions = new Float32Array(triCount * 9);
+  let offset = 0;
 
   for (const poly of polygons) {
     const verts = poly.vertices;
@@ -17,9 +25,9 @@ export function jscadToThree(geom: Geom3): BufferGeometry {
       const b = verts[i];
       const c = verts[i + 1];
 
-      positions.push(a[0], a[1], a[2]);
-      positions.push(b[0], b[1], b[2]);
-      positions.push(c[0], c[1], c[2]);
+      positions[offset++] = a[0]; positions[offset++] = a[1]; positions[offset++] = a[2];
+      positions[offset++] = b[0]; positions[offset++] = b[1]; positions[offset++] = b[2];
+      positions[offset++] = c[0]; positions[offset++] = c[1]; positions[offset++] = c[2];
     }
   }
 
