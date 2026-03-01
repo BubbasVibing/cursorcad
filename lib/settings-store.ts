@@ -1,6 +1,6 @@
 import type { CadSettings } from "@/lib/types";
 
-const STORAGE_KEY = "cad-cursor-settings";
+const STORAGE_KEY = "cadoncrack-settings";
 
 export const DEFAULT_SETTINGS: CadSettings = {
   unitSystem: "mm",

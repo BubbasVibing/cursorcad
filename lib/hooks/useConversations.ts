@@ -100,7 +100,7 @@ export function useConversations() {
       return;
     }
 
-    const MIGRATION_KEY = `cad-cursor-migrated-${session?.user?.id}`;
+    const MIGRATION_KEY = `cadoncrack-migrated-${session?.user?.id}`;
     if (localStorage.getItem(MIGRATION_KEY)) {
       setMigrated(true);
       return;
