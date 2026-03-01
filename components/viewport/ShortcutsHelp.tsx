@@ -21,13 +21,16 @@ interface ShortcutsHelpProps {
 
 /** Shortcut definition: keyboard key label + human-readable action description. */
 const SHORTCUTS = [
+  { key: "[", action: "Toggle sidebar" },
+  { key: "]", action: "Toggle chat" },
+  { key: "E", action: "Engineering tools" },
   { key: "F", action: "Zoom to fit" },
   { key: "W", action: "Toggle wireframe" },
   { key: "1", action: "Front view" },
   { key: "2", action: "Right view" },
   { key: "3", action: "Top view" },
   { key: "4", action: "Isometric view" },
-  { key: "Esc", action: "Deselect" },
+  { key: "Esc", action: "Deselect / close" },
   { key: "?", action: "Toggle this help" },
 ] as const;
 

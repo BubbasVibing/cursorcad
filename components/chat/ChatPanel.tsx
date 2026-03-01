@@ -102,10 +102,21 @@ interface ChatPanelProps {
   onGeneratingChange?: (generating: boolean) => void;
   currentCode?: string | null;
   onPromptSent?: (prompt: string) => void;
+  onMessagesChange?: (messages: import("@/lib/types").ConversationMessage[]) => void;
+  initialMessages?: import("@/lib/types").ConversationMessage[];
 }
 
-export default function ChatPanel({ onCodeGenerated, onGeneratingChange, currentCode, onPromptSent }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function ChatPanel({ onCodeGenerated, onGeneratingChange, currentCode, onPromptSent, onMessagesChange, initialMessages }: ChatPanelProps) {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (initialMessages && initialMessages.length > 0) {
+      return initialMessages.map((m, i) => ({
+        id: `restored-${i}`,
+        role: m.role,
+        content: m.content,
+      }));
+    }
+    return [];
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -115,10 +126,19 @@ export default function ChatPanel({ onCodeGenerated, onGeneratingChange, current
   const [streamAttempt, setStreamAttempt] = useState(1);
 
   /** Conversation history sent to Claude (separate from UI messages). */
-  const conversationRef = useRef<ConversationMessage[]>([]);
+  const conversationRef = useRef<ConversationMessage[]>(initialMessages ? [...initialMessages] : []);
 
   /** Guard against rapid double-sends before isGenerating state propagates. */
   const sendingRef = useRef(false);
+
+  /* ---- Notify parent when messages change ---- */
+  useEffect(() => {
+    if (onMessagesChange && messages.length > 0) {
+      onMessagesChange(
+        messages.map((m) => ({ role: m.role, content: m.content }))
+      );
+    }
+  }, [messages, onMessagesChange]);
 
   /* ---- Auto-scroll to bottom when new messages arrive ---- */
   useEffect(() => {

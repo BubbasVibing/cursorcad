@@ -11,22 +11,31 @@
  *   - Grid size controls (+/- buttons) and reset-view button
  *   - Multi-part JSCAD geometry rendering via GeometryMesh
  *   - HUD overlay, error overlay, and loading overlay
+ *   - EngineeringBar for transform/measure/section tools
  */
 
 import { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Bounds, useBounds } from "@react-three/drei";
-import { ACESFilmicToneMapping, Box3, Vector3 } from "three";
+import { ACESFilmicToneMapping, Box3, Vector3, MathUtils } from "three";
 import GeometryMesh from "@/components/viewport/GeometryMesh";
 import ViewportHUD from "@/components/viewport/ViewportHUD";
 import PartsList from "@/components/viewport/PartsList";
 import ShortcutsHelp from "@/components/viewport/ShortcutsHelp";
+import EngineeringBar from "@/components/engineering/EngineeringBar";
+import type { TransformValues } from "@/components/engineering/TransformPanel";
 import { runJscad } from "@/lib/jscad-runner";
 import { jscadPartsToThree } from "@/lib/jscad-to-three";
-import type { JscadPart, ThreePart } from "@/lib/types";
+import type { JscadPart, ThreePart, CadSettings } from "@/lib/types";
 import type { OrbitControls as OrbitControlsType } from "three-stdlib";
 
 const CANVAS_STYLE = { background: "#eeeef2" } as const;
+
+const DEFAULT_TRANSFORM: TransformValues = {
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  scale: [1, 1, 1],
+};
 
 /* ---- Demo code shown when no user-generated code is present ---- */
 const DEMO_CODE = `
@@ -38,6 +47,10 @@ return subtract(block, hole);
 interface ViewportCanvasProps {
   jscadCode?: string | null;
   modelDescription?: string | null;
+  settings?: CadSettings;
+  leftSidebarOpen?: boolean;
+  chatOpen?: boolean;
+  panelWidth?: number;
 }
 
 /** Turn a user prompt into a safe filename slug. */
@@ -146,19 +159,40 @@ function ScreenshotHelper({
   return null;
 }
 
-export default function ViewportCanvas({ jscadCode, modelDescription }: ViewportCanvasProps) {
+export default function ViewportCanvas({
+  jscadCode,
+  modelDescription,
+  settings,
+  leftSidebarOpen = false,
+  chatOpen = true,
+  panelWidth = 400,
+}: ViewportCanvasProps) {
   const code = jscadCode || DEMO_CODE;
   const isDemo = !jscadCode;
 
-  const [exportFormat, setExportFormat] = useState<"stl" | "3mf">("stl");
+  const [exportFormat, setExportFormat] = useState<"stl" | "3mf">(settings?.exportFormat || "stl");
   const [wireframe, setWireframe] = useState(false);
-  const [gridSize, setGridSize] = useState(20);
+  const [gridSize, setGridSize] = useState(settings?.gridDensity || 20);
   const [selectedPart, setSelectedPart] = useState<number | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showEngBar, setShowEngBar] = useState(false);
+  const [transform, setTransform] = useState<TransformValues>({ ...DEFAULT_TRANSFORM });
   const controlsRef = useRef<OrbitControlsType>(null);
   const zoomToFitRef = useRef<(() => void) | null>(null);
   const viewPresetRef = useRef<((preset: "top" | "front" | "right" | "iso") => void) | null>(null);
   const screenshotRef = useRef<(() => void) | null>(null);
+
+  // Sync settings-driven values
+  useEffect(() => {
+    if (settings?.gridDensity) setGridSize(settings.gridDensity);
+  }, [settings?.gridDensity]);
+
+  useEffect(() => {
+    if (settings?.exportFormat) setExportFormat(settings.exportFormat);
+  }, [settings?.exportFormat]);
+
+  const showGrid = settings?.showGrid !== false;
+  const unitSystem = settings?.unitSystem || "mm";
 
   /* ---- JSCAD pipeline: compile code -> multi-part geometry ---- */
   const { parts, jscadParts, error, faceCount, partCount, dimensions } = useMemo(() => {
@@ -200,10 +234,28 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
     };
   }, [code]);
 
-  // Reset selected part when code changes
+  // Reset selected part and transforms when code changes
   useEffect(() => {
     setSelectedPart(null);
+    setTransform({ ...DEFAULT_TRANSFORM });
   }, [code]);
+
+  /* ---- Transform handlers ---- */
+  const handleTransformChange = useCallback(
+    (type: "position" | "rotation" | "scale", axis: 0 | 1 | 2, value: number) => {
+      setTransform((prev) => {
+        const next = { ...prev };
+        next[type] = [...prev[type]] as [number, number, number];
+        next[type][axis] = value;
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleTransformReset = useCallback(() => {
+    setTransform({ ...DEFAULT_TRANSFORM });
+  }, []);
 
   /* ---- Keyboard shortcuts ---- */
   const handleZoomToFit = useCallback(() => zoomToFitRef.current?.(), []);
@@ -224,6 +276,12 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
           e.preventDefault();
           setWireframe((w) => !w);
           break;
+        case "e":
+          if (!isDemo && parts) {
+            e.preventDefault();
+            setShowEngBar((s) => !s);
+          }
+          break;
         case "1":
           handleViewPreset("front");
           break;
@@ -239,6 +297,7 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
         case "Escape":
           setSelectedPart(null);
           setShowShortcuts(false);
+          setShowEngBar(false);
           break;
         case "?":
           setShowShortcuts((s) => !s);
@@ -247,7 +306,7 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleZoomToFit, handleViewPreset]);
+  }, [handleZoomToFit, handleViewPreset, isDemo, parts]);
 
   const handleCloseShortcuts = useCallback(() => setShowShortcuts(false), []);
   const handleToggleWireframe = useCallback(() => setWireframe((w) => !w), []);
@@ -275,6 +334,20 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
     controlsRef.current?.reset();
   }, []);
 
+  const handleSnapToggle = useCallback(() => {
+    // Snap toggle is visual feedback only for now
+  }, []);
+
+  // Convert rotation degrees to radians for Three.js
+  const rotationRadians: [number, number, number] = useMemo(
+    () => [
+      MathUtils.degToRad(transform.rotation[0]),
+      MathUtils.degToRad(transform.rotation[1]),
+      MathUtils.degToRad(transform.rotation[2]),
+    ],
+    [transform.rotation],
+  );
+
   return (
     <div className="relative h-full w-full bg-gray-200">
       <ViewportHUD
@@ -283,6 +356,7 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
         partCount={partCount}
         isWatertight={parts ? true : null}
         dimensions={dimensions}
+        unitSystem={unitSystem}
         onExport={handleExport}
         exportFormat={exportFormat}
         onExportFormatChange={setExportFormat}
@@ -440,6 +514,19 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
         onClose={handleCloseShortcuts}
       />
 
+      {/* ---- Engineering bar ---- */}
+      <EngineeringBar
+        visible={showEngBar && !isDemo && !!parts}
+        leftSidebarOpen={leftSidebarOpen}
+        chatOpen={chatOpen}
+        panelWidth={panelWidth}
+        transformValues={transform}
+        onTransformChange={handleTransformChange}
+        onTransformReset={handleTransformReset}
+        snapToGrid={settings?.snapToGrid || false}
+        onSnapToggle={handleSnapToggle}
+      />
+
       {/* ---- R3F Canvas with quality settings ---- */}
       <Canvas
         camera={{ position: [6, 4, 6], fov: 45 }}
@@ -471,11 +558,13 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
         <directionalLight position={[0, -4, 6]} intensity={0.15} />
 
         {/* ---- Grid: remount when gridSize changes ---- */}
-        <group key={gridSize}>
-          <gridHelper args={[gridSize, gridSize, "#000000", "#333333"]} position={[0, 0, 0]} />
-        </group>
+        {showGrid && (
+          <group key={gridSize}>
+            <gridHelper args={[gridSize, gridSize, "#000000", "#333333"]} position={[0, 0, 0]} />
+          </group>
+        )}
 
-        <AxisLines length={gridSize} />
+        {showGrid && <AxisLines length={gridSize} />}
 
         <OrbitControls
           ref={controlsRef}
@@ -489,10 +578,17 @@ export default function ViewportCanvas({ jscadCode, modelDescription }: Viewport
         {/* ---- Multi-part 3D geometry with Bounds for zoom-to-fit ---- */}
         {/* Rotate -90° around X to map JSCAD Z-up to Three.js Y-up */}
         <group rotation={[-Math.PI / 2, 0, 0]}>
-          <Bounds maxDuration={0.8} margin={1.2}>
-            <GeometryMesh parts={parts} wireframe={wireframe} selectedPart={selectedPart} />
-            <BoundsController zoomToFitRef={zoomToFitRef} viewPresetRef={viewPresetRef} />
-          </Bounds>
+          <group
+            position={transform.position}
+            scale={transform.scale}
+          >
+            <group rotation={rotationRadians}>
+              <Bounds maxDuration={0.8} margin={1.2}>
+                <GeometryMesh parts={parts} wireframe={wireframe} selectedPart={selectedPart} />
+                <BoundsController zoomToFitRef={zoomToFitRef} viewPresetRef={viewPresetRef} />
+              </Bounds>
+            </group>
+          </group>
         </group>
 
         {/* ---- Screenshot helper ---- */}
