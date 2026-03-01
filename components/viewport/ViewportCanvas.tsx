@@ -145,7 +145,7 @@ export default function ViewportCanvas({ jscadCode, isGenerating, modelDescripti
   return (
     <div className="relative h-full w-full bg-gray-200">
       <ViewportHUD
-        modelName={parts ? (isDemo ? "Demo: Cube with hole" : "Generated Model") : null}
+        modelName={parts ? (isDemo ? "Demo: Cube with hole" : modelDescription || "Generated Model") : null}
         faceCount={faceCount}
         partCount={partCount}
         isWatertight={parts ? true : null}
